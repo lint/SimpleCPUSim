@@ -9,6 +9,8 @@
 // populates the params struct with values from a config file
 void readConfig(char *configFn, Params *params) {
 
+    printf("processing config file...\n");
+
     // setup default parameter values
     params->NF = 4;
     params->NI = 16;
@@ -27,7 +29,7 @@ void readConfig(char *configFn, Params *params) {
         // read the file looking for inputs in the form of 'parameter value'
         // note this fails on malformed input files such as containing a line NF 1 NI, NI also gets assigned 1 
         while (fscanf(fp, "%s %d", key, &value) != EOF) {
-            printf("key: %s, value: %d\n", key, value);
+            // printf("key: %s, value: %d\n", key, value);
 
             if (value < 1) {
                 printf("found invalid value '%d' for key '%s' when reading config, skipping...\n", value, key);
@@ -59,6 +61,8 @@ void readConfig(char *configFn, Params *params) {
 
 // process input file
 void processInput(char *inputFn, CPU *cpu) {
+
+    printf("processing input program file...\n");
     
     FILE *fp = fopen(inputFn, "r");
     if (fp == NULL) {
@@ -73,7 +77,7 @@ void processInput(char *inputFn, CPU *cpu) {
 
     // read input file line by line
     while (fgets(buf, bufSize, fp) != NULL) {
-        printf("line: %s\n", buf);
+        // printf("line: %s\n", buf);
 
         // skip comment lines that start with %
         if (buf[0] == '%') {
@@ -141,7 +145,7 @@ void processInput(char *inputFn, CPU *cpu) {
 
             // the first token containing a colon indicates it is a label
             if (strstr(cur, ":")) {
-                printf("found label: %s\n", cur);
+                // printf("found label: %s\n", cur);
                 
                 memcpy(inst.label, cur, strlen(cur)-1);
                 inst.label[strlen(cur)-1] = '\0';
@@ -219,8 +223,7 @@ void processInput(char *inputFn, CPU *cpu) {
                 break;
             }
 
-            printf("instruction:\n\tlabel: %s\n\ttype: %i\n\timm: %i\n\tdestReg: %i\n\tsourceReg1: %i\n\tsourceReg2: %i\n\tbranchTargetAddr: %i\n\tbranchTargetLabel: %s\n", 
-                inst.label, inst.type, inst.imm, inst.destReg, inst.source1Reg, inst.source2Reg, inst.branchTargetAddr, inst.branchTargetLabel);
+            // printInstruction(inst);
 
             // add the parsed instruction to the cache
             addInstructionToCache(cpu->instCache, inst);
@@ -256,6 +259,7 @@ int main(int argc, char *argv[]) {
     initCPU(&cpu, &params);
     processInput(argv[2], &cpu);
     printDataCache(cpu.dataCache);
+    executeCPU(&cpu);
    
 
     return 0;

@@ -45,7 +45,7 @@ void extendInstCacheIfNeeded(InstCache *instCache) {
 Instruction *readInstructionCache(InstCache *instCache, int address) {
     int index = address / 4; // since there are 4 bytes per instruction being simulated
 
-    if (index < 0 || index >= instCache->cacheSize) {
+    if (index < 0 || index >= instCache->numInsts) {
         printf("error: attempted to read instruction at address '%d' (index '%d') which is out of bounds\n", address, index);
         return NULL;
     }
@@ -85,7 +85,7 @@ int resolveInstLabels(InstCache *instCache) {
 
                 // check if labels match
                 if (!strcmp(inst1->branchTargetLabel, inst2->label)) {
-                    printf("instruction: %i (address: %i) has the target label: %s matched by branch: %i\n", j, j * 4, inst2->label, i);
+                    // printf("instruction: %i (address: %i) has the target label: %s matched by branch: %i\n", j, j * 4, inst2->label, i);
 
                     inst1->branchTargetAddr = j * 4; // simulating instructions taking 4 bytes
                     foundMatch = 1;

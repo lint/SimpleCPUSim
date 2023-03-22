@@ -5,6 +5,7 @@
 #include "cpu.h"
 #include "types/types.h"
 #include "memory/memory.h"
+#include "stage_units/stage_units.h"
 
 // creates a new CPU struct, initializes its data structures and components, and returns it
 void initCPU(CPU *cpu, Params *params) {
@@ -18,6 +19,9 @@ void initCPU(CPU *cpu, Params *params) {
 
     cpu->registerFile = malloc(sizeof(RegisterFile));
     initRegisterFile(cpu->registerFile);
+
+    cpu->fetchUnit = malloc(sizeof(FetchUnit));
+    initFetchUnit(cpu->fetchUnit, params->NF);
 
     cpu->registerMapTable = calloc(RN_SIZE, sizeof(RegisterMappingNode *)); // includes $0 and PC, remove them?
 
@@ -36,20 +40,42 @@ void initCPU(CPU *cpu, Params *params) {
     }
 }
 
+// free any elements of the CPU that were stored on the heap
 void teardownCPU(CPU *cpu) {
-    
+
+    if (cpu->dataCache) {
+        teardownDataCache(cpu->dataCache);
+        free(cpu->dataCache);
+    }
+
+    if (cpu->instCache) {
+        teardownInstCache(cpu->instCache);
+        free(cpu->instCache);
+    }
+
+    if (cpu->registerFile) {
+        teardownRegisterFile(cpu->registerFile);
+        free(cpu->registerFile);
+    }
+
+    if (cpu->fetchUnit) {
+        teardownFetchUnit(cpu->fetchUnit);
+        free(cpu->fetchUnit);
+    }
 }
 
+// start executing instructions on the CPU
+void executeCPU(CPU *cpu) {
 
+    int cycle = 0;
 
-// void run(CPU *cpu) {
+    // infinite loop to cycle the clock until execution finishes
+    for (int i = 0; i < 10; i++) {
 
-//     for (;;) {
+        cycleFetchUnit(cpu->fetchUnit, cpu->registerFile, cpu->instCache);
 
-//         cycle_fetch_unit();
-//         cycle_decode_unit();
-//         cycle_issue_unit();
         
-
-//     }
-// }
+        // break;
+        cycle++;
+    }
+}
