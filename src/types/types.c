@@ -1,8 +1,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "helpers.h"
-#include "cpu.h"
+#include "types.h"
 
 enum InstructionType stringToInstructionType(char *s) {
 

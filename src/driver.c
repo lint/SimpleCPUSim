@@ -3,16 +3,8 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include "cpu.h"
-#include "helpers.h"
-
-// struct containing parameters read from a config file
-typedef struct Params {
-    int NF; // instructions fetched per cycle
-    int NI; // decoded instruction queue length
-    int NW; // instructions issued to reservation stations per cycle
-    int NR; // circular ROB entries
-    int NB; // common data busses 
-} Params;
+#include "types/types.h"
+#include "memory/memory.h"
 
 // populates the params struct with values from a config file
 void readConfig(char *configFn, Params *params) {
@@ -122,7 +114,7 @@ void processInput(char *inputFn, CPU *cpu) {
                 break;
             } else {
                 // no errors, write the byte
-                writeByteToDataCache(cpu, address, (unsigned char)value);
+                writeByteToDataCache(cpu->dataCache, address, (unsigned char)value);
             }
 
         // proces instructions
@@ -231,13 +223,13 @@ void processInput(char *inputFn, CPU *cpu) {
                 inst.label, inst.type, inst.imm, inst.destReg, inst.source1Reg, inst.source2Reg, inst.branchTargetAddr, inst.branchTargetLabel);
 
             // add the parsed instruction to the cache
-            addInstructionToCache(cpu, inst);
+            addInstructionToCache(cpu->instCache, inst);
         }      
     }
     fclose(fp);
 
     // after all instructions have been parsed, resolve branch target labels to addresses
-    int resolveLabelsError = resolveInstLabels(cpu);
+    int resolveLabelsError = resolveInstLabels(cpu->instCache);
 
     if (readError || resolveLabelsError) {
         printf("an error was encountered while processing the input file, exiting...\n");
@@ -261,11 +253,10 @@ int main(int argc, char *argv[]) {
 
     // create new CPU struct and initialize it
     CPU cpu;
-    initCPU(&cpu);
+    initCPU(&cpu, &params);
     processInput(argv[2], &cpu);
-    printDataCache(&cpu);
-
-    
+    printDataCache(cpu.dataCache);
+   
 
     return 0;
 }
