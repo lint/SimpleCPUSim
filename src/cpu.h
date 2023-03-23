@@ -5,7 +5,7 @@ typedef struct InstCache InstCache;
 typedef struct DataCache DataCache;
 typedef struct RegisterFile RegisterFile;
 typedef struct FetchUnit FetchUnit;
-typedef struct RegisterMappingNode RegisterMappingNode;
+typedef struct DecodeUnit DecodeUnit;
 
 // struct representing the CPU
 typedef struct CPU {
@@ -16,9 +16,7 @@ typedef struct CPU {
     RegisterFile *registerFile;
 
     FetchUnit *fetchUnit;
-
-    RegisterMappingNode **registerMapTable;
-    RegisterMappingNode *registerFreeList;
+    DecodeUnit *decodeUnit;
 
 } CPU;
 

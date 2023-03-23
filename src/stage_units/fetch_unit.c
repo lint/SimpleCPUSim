@@ -13,7 +13,7 @@ void initFetchUnit(FetchUnit *fetchUnit, int NF) {
     printf("initializing fetch unit...\n");
 
     fetchUnit->NF = NF;
-    fetchUnit->outputBuffer = calloc(sizeof(Instruction *), NF);
+    fetchUnit->outputBuffer = calloc(NF, sizeof(Instruction *));
     fetchUnit->outputBufferSize = NF;
     fetchUnit->numInstsInBuffer = 0;
 }
@@ -42,7 +42,7 @@ void extendFetchUnitOutputBufferIfNeeded(FetchUnit *fetchUnit) {
         memcpy(fetchUnit->outputBuffer, oldBuffer, oldSize * sizeof(Instruction *));
         free(oldBuffer);
 
-        printf("extending instruction cache to %i entries\n", newSize);
+        printf("extending fetch unit output buffer to %i entries\n", newSize);
     }
 }
 
@@ -50,6 +50,18 @@ void extendFetchUnitOutputBufferIfNeeded(FetchUnit *fetchUnit) {
 void addInstToFetchUnitOutputBuffer(FetchUnit *fetchUnit, Instruction *inst) {
     extendFetchUnitOutputBufferIfNeeded(fetchUnit);
     fetchUnit->outputBuffer[fetchUnit->numInstsInBuffer++] = inst;
+}
+
+// prints the current state of the output buffer
+void printFetchUnitOutputBuffer(FetchUnit *fetchUnit) {
+
+    printf("fetch unit output buffer: size: %i, numInsts: %i, items: ", fetchUnit->outputBufferSize, fetchUnit->numInstsInBuffer);
+
+    for (int i = 0; i < fetchUnit->numInstsInBuffer; i++) {
+        printf("%p, ", fetchUnit->outputBuffer[i]);
+    }
+
+    printf("\n");
 }
 
 // execute fetch unit's operations during a clock cycle
