@@ -6,20 +6,25 @@
 #include "../types/types.h"
 
 // initialize a decode unit struct
-void initDecodeUnit(DecodeUnit *decodeUnit, int NF, int NI) {
+void initDecodeUnit(DecodeUnit *decodeUnit, int NF, int NI, 
+    Instruction **instFetchBuffer, int *instFetchBufferSize, int *numInstsInBuffer, 
+    Instruction **instDecodeQueue, int *numInstsInQueue) {
 
     decodeUnit->NI = NI;
 
-    decodeUnit->inputBuffer = calloc(NF, sizeof(Instruction *));
-    decodeUnit->inputBufferSize = NF;
-    decodeUnit->numInstsInBuffer = 0;
+    // set fetch buffer variables
+    decodeUnit->instFetchBuffer = instFetchBuffer;
+    decodeUnit->instFetchBufferSize = instFetchBufferSize;
+    decodeUnit->numInstsInBuffer = numInstsInBuffer;
 
-    decodeUnit->outputQueue = calloc(NI, sizeof(Instruction *));
-    decodeUnit->numInstsInQueue = 0;
-    decodeUnit->numInstsMovedToQueue = 0;
+    // set decode queue variables
+    decodeUnit->instDecodeQueue = instDecodeQueue;
+    decodeUnit->numInstsInQueue = numInstsInQueue;
 
+    // initialize map table
     decodeUnit->registerMapTable = calloc(RN_SIZE, sizeof(RegisterMappingNode *)); // includes $0 and PC, remove them?
 
+    // initialize free list
     RegisterMappingNode *prevNode = NULL;
     for (int i = 0; i < PHYS_RN_SIZE; i++) {
 
@@ -39,13 +44,6 @@ void initDecodeUnit(DecodeUnit *decodeUnit, int NF, int NI) {
 
 // free any elements in the decode unit stored on the heap
 void teardownDecodeUnit(DecodeUnit *decodeUnit) {
-    if (decodeUnit->outputQueue) {
-        free(decodeUnit->outputQueue);
-    }
-
-    if (decodeUnit->inputBuffer) {
-        free(decodeUnit->inputBuffer);
-    }
 
     RegisterMappingNode *cur = decodeUnit->registerFreeList;
     RegisterMappingNode *prev = NULL;
@@ -71,49 +69,10 @@ void teardownDecodeUnit(DecodeUnit *decodeUnit) {
     }
 }
 
-// doubles the size of the input buffer if necessary
-void extendDecodeUnitInputBufferIfNeeded(DecodeUnit *decodeUnit) {
-
-    // only extend the buffer if it is full
-    if (decodeUnit->numInstsInBuffer == decodeUnit->inputBufferSize) {
-        
-        // get old values
-        Instruction **oldBuffer = decodeUnit->inputBuffer;
-        int oldSize = decodeUnit->inputBufferSize;
-        int newSize = oldSize * 2;
-
-        // reallocate array and copy contents
-        decodeUnit->inputBufferSize = newSize;
-        decodeUnit->inputBuffer = calloc(newSize, sizeof(Instruction *));
-        memcpy(decodeUnit->inputBuffer, oldBuffer, oldSize * sizeof(Instruction *));
-        free(oldBuffer);
-
-        printf("extending decode unit output buffer to %i entries\n", newSize);
-    }
-}
-
-// sets the size of the input buffer
-void setDecodeUnitInputBufferSize(DecodeUnit *decodeUnit, int newSize) {
-
-    // only allow increases of size
-    if (newSize > decodeUnit->inputBufferSize) {
-        
-        Instruction **oldBuffer = decodeUnit->inputBuffer;
-        int oldSize = decodeUnit->inputBufferSize;
-
-        // reallocate array and copy contents
-        decodeUnit->inputBufferSize = newSize;
-        decodeUnit->inputBuffer = calloc(newSize, sizeof(Instruction *));
-        memcpy(decodeUnit->inputBuffer, oldBuffer, oldSize * sizeof(Instruction *));
-        free(oldBuffer);
-
-        printf("extending fetch unit output buffer to %i entries\n", newSize);
-    }
-}
-
 // adds an instruction to the output queue
 void addInstructionToDecodeQueue(DecodeUnit *decodeUnit, Instruction *inst) {
-    decodeUnit->outputQueue[decodeUnit->numInstsInQueue++] = inst;
+    decodeUnit->instDecodeQueue[(*decodeUnit->numInstsInQueue)++] = inst;
+    printf("added instruction: %p to decode queue, numInstsInQueue: %i\n", inst, *decodeUnit->numInstsInQueue);
 }
 
 // prints the current state of the map table
@@ -155,31 +114,6 @@ void printFreeList(DecodeUnit *decodeUnit) {
     } else {
         printf("none\n");
     }
-}
-
-// prints the current state of the input buffer
-void printDecodeUnitInputBuffer(DecodeUnit *decodeUnit) {
-
-    printf("decode unit input buffer: size: %i, numInsts: %i, items: ", decodeUnit->inputBufferSize, decodeUnit->numInstsInBuffer);
-
-    for (int i = 0; i < decodeUnit->numInstsInBuffer; i++) {
-        printf("%p, ", decodeUnit->inputBuffer[i]);
-    }
-
-    printf("\n");
-}
-
-// prints the current state of the output queue
-void printDecodeUnitOutputQueue(DecodeUnit *decodeUnit) {
-
-    printf("decode unit output queue: size: %i, numInsts: %i, items: \n", decodeUnit->NI, decodeUnit->numInstsInQueue);
-
-    for (int i = 0; i < decodeUnit->numInstsInQueue; i++) {
-        //printf("%p, ", decodeUnit->outputQueue[i]);
-        printInstruction(*decodeUnit->outputQueue[i]);
-    }
-
-    printf("\n");
 }
 
 // returns the next avaialble physical register in the free list
@@ -341,11 +275,15 @@ void performRegisterRenaming(DecodeUnit *decodeUnit, Instruction *inst) {
 // execute decode unit's operations during a clock cycle
 void cycleDecodeUnit(DecodeUnit *decodeUnit) {
 
-    decodeUnit->numInstsMovedToQueue = 0;
+    printf("\nperforming decode unit operations...\n");
+
+    int numInstsMovedToQueue = 0;
+
+    printf("num insts in buffer: %i\n", *decodeUnit->numInstsInBuffer);
 
     // loop through all instructions in the input buffer
-    for (int i = 0; i < decodeUnit->numInstsInBuffer; i++) {
-        Instruction *inst = decodeUnit->inputBuffer[i];
+    for (int i = 0; i < *decodeUnit->numInstsInBuffer; i++) {
+        Instruction *inst = decodeUnit->instFetchBuffer[i];
 
         if (!inst) {
             printf("error: was unable to get instruction from decode input buffer when expected\n");
@@ -356,19 +294,23 @@ void cycleDecodeUnit(DecodeUnit *decodeUnit) {
         performRegisterRenaming(decodeUnit, inst);
 
         // attempt to add instruction to the decode queue
-        if (decodeUnit->numInstsInQueue < decodeUnit->NI) {
+        if (*decodeUnit->numInstsInQueue < decodeUnit->NI) {
             addInstructionToDecodeQueue(decodeUnit, inst);
-            decodeUnit->numInstsMovedToQueue++;
+            numInstsMovedToQueue++;
         } else {
             // exit loop if queue is full
             break;
         }
     }
 
-    printFreeList(decodeUnit);
-    printMapTable(decodeUnit);
-    printf("num instructions moved to decode unit output queue: %i\n", decodeUnit->numInstsMovedToQueue);
-
-    // instructions are removed from the buffer when it is synced with the fetch output buffer in cpu.c 
-    // it is not updated here to prevent unnecessary computations
+    // remove instructions from fetch buffer that were moved to the decode queue
+    if (numInstsMovedToQueue > 0) {
+        for (int i = numInstsMovedToQueue; i < *decodeUnit->numInstsInBuffer; i++) {
+            decodeUnit->instFetchBuffer[i - numInstsMovedToQueue] = decodeUnit->instFetchBuffer[i];
+            decodeUnit->instFetchBuffer[i] = NULL;
+        }
+        *decodeUnit->numInstsInBuffer -= numInstsMovedToQueue;
+    }
+    
+    printf("num instructions moved from fetch buffer to decode queue: %i\n", numInstsMovedToQueue);
 }
