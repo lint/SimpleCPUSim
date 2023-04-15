@@ -6,17 +6,27 @@ typedef struct DataCache DataCache;
 typedef struct RegisterFile RegisterFile;
 typedef struct FetchUnit FetchUnit;
 typedef struct DecodeUnit DecodeUnit;
+typedef struct IssueUnit IssueUnit;
+typedef struct ROBStatusTable ROBStatusTable;
+typedef struct RegisterStatusTable RegisterStatusTable;
+typedef struct ResStationStatusTable ResStationStatusTable;
 
 // struct representing the CPU
 typedef struct CPU {
 
     Params *params;
+    
     InstCache *instCache;
     DataCache *dataCache;
     RegisterFile *registerFile;
 
+    ROBStatusTable *robTable;
+    RegisterStatusTable *regTable;
+    ResStationStatusTable *resStationTable;
+
     FetchUnit *fetchUnit;
     DecodeUnit *decodeUnit;
+    IssueUnit *issueUnit;
 
 } CPU;
 

@@ -6,25 +6,54 @@
 #include "types/types.h"
 #include "memory/memory.h"
 #include "stage_units/stage_units.h"
+#include "status_tables/status_tables.h"
 
 // creates a new CPU struct, initializes its data structures and components, and returns it
 void initCPU(CPU *cpu, Params *params) {
     cpu->params = params;
    
+    // initialize data and instruction memory caches
     cpu->dataCache = malloc(sizeof(DataCache));
     initDataCache(cpu->dataCache);
 
     cpu->instCache = malloc(sizeof(InstCache));
     initInstCache(cpu->instCache);
 
+    // initialize register file
     cpu->registerFile = malloc(sizeof(RegisterFile));
     initRegisterFile(cpu->registerFile);
 
+    // initialize status tables
+    cpu->robTable = malloc(sizeof(ROBStatusTable));
+    initROBStatusTable(cpu->robTable, params->NB);
+
+    cpu->resStationTable = malloc(sizeof(ResStationStatusTable));
+    initResStationStatusTable(cpu->resStationTable);
+
+    cpu->regTable = malloc(sizeof(RegisterStatusTable));
+    initRegisterStatusTable(cpu->regTable);
+
+    // initialize functional units
+
+    // initialize instruction fetch buffer
+    Instruction **instFetchBuffer = calloc(params->NF, sizeof(Instruction *));
+    int *instFetchBufferSize = malloc(sizeof(int));
+    int *numInstsInFetchBuffer = malloc(sizeof(int));
+    *instFetchBufferSize = params->NF;
+    *numInstsInFetchBuffer = 0;
+
+    // initalize decode queue
+    Instruction **instDecodeQueue = calloc(params->NI, sizeof(Instruction *));
+    int *numInstsInDecodeQueue = malloc(sizeof(int));    
+
     cpu->fetchUnit = malloc(sizeof(FetchUnit));
-    initFetchUnit(cpu->fetchUnit, params->NF);
+    initFetchUnit(cpu->fetchUnit, params->NF, instFetchBuffer, instFetchBufferSize, numInstsInFetchBuffer);
 
     cpu->decodeUnit = malloc(sizeof(DecodeUnit));
-    initDecodeUnit(cpu->decodeUnit, params->NF, params->NI);
+    initDecodeUnit(cpu->decodeUnit, params->NF, params->NI, instFetchBuffer, instFetchBufferSize, numInstsInFetchBuffer, instDecodeQueue, numInstsInDecodeQueue);
+
+    cpu->issueUnit = malloc(sizeof(IssueUnit));
+    initIssueUnit(cpu->issueUnit, params->NW, params->NI);
 }
 
 // free any elements of the CPU that were stored on the heap
@@ -45,6 +74,21 @@ void teardownCPU(CPU *cpu) {
         free(cpu->registerFile);
     }
 
+    if (cpu->robTable) {
+        teardownROBStatusTable(cpu->robTable);
+        free(cpu->robTable);
+    }
+
+    if (cpu->regTable) {
+        teardownRegisterStatusTable(cpu->regTable);
+        free(cpu->regTable);
+    }
+
+    if (cpu->resStationTable) {
+        teardownResStationStatusTable(cpu->resStationTable);
+        free(cpu->resStationTable);
+    }
+
     if (cpu->fetchUnit) {
         teardownFetchUnit(cpu->fetchUnit);
         free(cpu->fetchUnit);
@@ -54,38 +98,42 @@ void teardownCPU(CPU *cpu) {
         teardownDecodeUnit(cpu->decodeUnit);
         free(cpu->decodeUnit);
     }
+
+    if (cpu->issueUnit) {
+        teardownIssueUnit(cpu->issueUnit);
+        free(cpu->issueUnit);
+    }
+
+    // make sure to free fetch buffer and decode queue
 }
 
-// sync the fetch and decode units' respective output and input buffers after cycle operations have completed
-void syncFetchDecodeBuffer(CPU *cpu) {
+// helper method to print the contents of the instruction fetch buffer
+void printInstructionFetchBuffer(CPU *cpu) {
 
     FetchUnit *fetchUnit = cpu->fetchUnit;
+
+    printf("instruction fetch buffer: %p, size: %i, numInsts: %i, items: ", fetchUnit->instFetchBuffer, *fetchUnit->instFetchBufferSize, *fetchUnit->numInstsInBuffer);
+
+    for (int i = 0; i < *fetchUnit->numInstsInBuffer; i++) {
+        printf("%p, ", fetchUnit->instFetchBuffer[i]);
+    }
+
+    printf("\n");
+}
+
+// helper method to print the current state of the decoded instruction queue
+void printDecodeUnitOutputQueue(CPU *cpu) {
+
     DecodeUnit *decodeUnit = cpu->decodeUnit;
-    int numInstsMoved = decodeUnit->numInstsMovedToQueue;
 
-    // remove instructions from the buffer that have been added to the queue
-    for (int i = 0; i < numInstsMoved; i++) {
-        fetchUnit->outputBuffer[i] = NULL;
+    printf("instruction decode queue: %p, size: %i, numInsts: %i, items: ", decodeUnit->instDecodeQueue, decodeUnit->NI, *decodeUnit->numInstsInQueue);
+
+    for (int i = 0; i < *decodeUnit->numInstsInQueue; i++) {
+        printf("%p, ", decodeUnit->instDecodeQueue[i]);
+        //printInstruction(*decodeUnit->instDecodeQueue[i]);
     }
 
-    // shift remaining instructions to beginning of buffer
-    if (numInstsMoved > 0) {
-        for (int i = numInstsMoved; i < fetchUnit->numInstsInBuffer ;i++) {
-            fetchUnit->outputBuffer[i - numInstsMoved] = fetchUnit->outputBuffer[i];
-            fetchUnit->outputBuffer[i] = NULL;
-        }
-    }    
-
-    fetchUnit->numInstsInBuffer -= numInstsMoved;
-
-    // ensure the buffers are the same size
-    if (decodeUnit->inputBufferSize < fetchUnit->outputBufferSize) {
-        setDecodeUnitInputBufferSize(decodeUnit, fetchUnit->outputBufferSize);
-    }
-
-    // copy fetch output buffer to decode input buffer
-    memcpy(decodeUnit->inputBuffer, fetchUnit->outputBuffer, fetchUnit->outputBufferSize * sizeof(Instruction *));
-    decodeUnit->numInstsInBuffer = fetchUnit->numInstsInBuffer;
+    printf("\n");
 }
 
 // start executing instructions on the CPU
@@ -95,16 +143,18 @@ void executeCPU(CPU *cpu) {
 
     // infinite loop to cycle the clock until execution finishes
     for (int i = 0; i < 3; i++) {
-        printf("cycle: %i\n", i);
+        printf("\ncycle: %i\n", i);
+
+        //cycleIssueUnit(cpu->issueUnit);
+        cycleDecodeUnit(cpu->decodeUnit);
+        printFreeList(cpu->decodeUnit);
+        printMapTable(cpu->decodeUnit);
+        printInstructionFetchBuffer(cpu);
+        printDecodeUnitOutputQueue(cpu);
 
         cycleFetchUnit(cpu->fetchUnit, cpu->registerFile, cpu->instCache);
-        cycleDecodeUnit(cpu->decodeUnit);
+        printInstructionFetchBuffer(cpu);
         
-        syncFetchDecodeBuffer(cpu);
-
-        printFetchUnitOutputBuffer(cpu->fetchUnit);
-        printDecodeUnitInputBuffer(cpu->decodeUnit);
-        printDecodeUnitOutputQueue(cpu->decodeUnit);
         // break;
         cycle++;
     }
