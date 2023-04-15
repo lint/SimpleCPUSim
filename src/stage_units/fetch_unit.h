@@ -6,16 +6,15 @@ typedef struct InstCache InstCache;
 
 // struct representing a fetch unit
 typedef struct FetchUnit {
-    Instruction **outputBuffer;
-    int outputBufferSize;
-    int numInstsInBuffer;
+    Instruction **instFetchBuffer;
+    int *instFetchBufferSize;
+    int *numInstsInBuffer;
     int NF;
 } FetchUnit;
 
 // fetch unit methods
-void initFetchUnit(FetchUnit *fetchUnit, int NF);
+void initFetchUnit(FetchUnit *fetchUnit, int NF, Instruction **instFetchBuffer, int *instFetchBufferSize, int *numInstsInBuffer);
 void teardownFetchUnit(FetchUnit *fetchUnit);
 void addInstToFetchUnitOutputBuffer(FetchUnit *fetchUnit, Instruction *inst);
 void extendFetchUnitOutputBufferIfNeeded(FetchUnit *fetchUnit);
-void printFetchUnitOutputBuffer(FetchUnit *fetchUnit);
 void cycleFetchUnit(FetchUnit *fetchUnit, RegisterFile *registerFile, InstCache *instCache);
