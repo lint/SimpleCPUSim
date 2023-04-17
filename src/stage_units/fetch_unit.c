@@ -61,7 +61,7 @@ void cycleFetchUnit(FetchUnit *fetchUnit, RegisterFile *registerFile, InstCache 
     printf("\nperforming fetch unit operations...\n");
 
     // get the current value of PC
-    int pcVal = readRegisterFile(registerFile, PHYS_PC);
+    int pcVal = readRegisterFileInt(registerFile, PHYS_PC);
 
     // get the next NF instructions
     for (int i = 0; i < fetchUnit->NF; i++) {
@@ -80,7 +80,7 @@ void cycleFetchUnit(FetchUnit *fetchUnit, RegisterFile *registerFile, InstCache 
     }
     
     // update the new value of PC in the register file
-    writeRegisterFile(registerFile, PHYS_PC, pcVal);
+    writeRegisterFileInt(registerFile, PHYS_PC, pcVal);
 
     // printf("instructions in fetch unit output buffer: \n");
     // for (int i = 0; i < fetchUnit->numInstsInBuffer; i++) {

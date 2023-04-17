@@ -11,11 +11,20 @@ typedef struct ROBStatusTable ROBStatusTable;
 typedef struct RegisterStatusTable RegisterStatusTable;
 typedef struct ResStationStatusTable ResStationStatusTable;
 
+// struct containing information about stall statistics
+typedef struct StallStats {
+
+    int fullROBStalls;
+    int fullResStationStalls;
+
+} StallStats;
+
 // struct representing the CPU
 typedef struct CPU {
 
     Params *params;
-    
+    StallStats *stallStats;
+
     InstCache *instCache;
     DataCache *dataCache;
     RegisterFile *registerFile;

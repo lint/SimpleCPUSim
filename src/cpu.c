@@ -8,9 +8,18 @@
 #include "stage_units/stage_units.h"
 #include "status_tables/status_tables.h"
 
+// create new stall statistics struct
+void initStallStats(StallStats *stallStats) {
+    stallStats->fullResStationStalls = 0;
+    stallStats->fullROBStalls = 0;
+}
+
 // creates a new CPU struct, initializes its data structures and components, and returns it
 void initCPU(CPU *cpu, Params *params) {
     cpu->params = params;
+
+    cpu->stallStats = malloc(sizeof(StallStats));
+    initStallStats(cpu->stallStats);
    
     // initialize data and instruction memory caches
     cpu->dataCache = malloc(sizeof(DataCache));
@@ -25,7 +34,7 @@ void initCPU(CPU *cpu, Params *params) {
 
     // initialize status tables
     cpu->robTable = malloc(sizeof(ROBStatusTable));
-    initROBStatusTable(cpu->robTable, params->NB);
+    initROBStatusTable(cpu->robTable, params->NR);
 
     cpu->resStationTable = malloc(sizeof(ResStationStatusTable));
     initResStationStatusTable(cpu->resStationTable);
@@ -53,7 +62,7 @@ void initCPU(CPU *cpu, Params *params) {
     initDecodeUnit(cpu->decodeUnit, params->NF, params->NI, instFetchBuffer, instFetchBufferSize, numInstsInFetchBuffer, instDecodeQueue, numInstsInDecodeQueue);
 
     cpu->issueUnit = malloc(sizeof(IssueUnit));
-    initIssueUnit(cpu->issueUnit, params->NW, params->NI);
+    initIssueUnit(cpu->issueUnit, params->NW, params->NI, instDecodeQueue, numInstsInDecodeQueue);
 }
 
 // free any elements of the CPU that were stored on the heap
@@ -136,16 +145,27 @@ void printDecodeUnitOutputQueue(CPU *cpu) {
     printf("\n");
 }
 
+void printStallStats(StallStats *stallStats) {
+    printf("\nstall statistics:\n");
+    printf("\tstalls due to full ROB: %i\n", stallStats->fullROBStalls);
+    printf("\tstalls due to full reservation stations: %i\n", stallStats->fullResStationStalls);
+}
+
 // start executing instructions on the CPU
 void executeCPU(CPU *cpu) {
 
     int cycle = 0;
 
     // infinite loop to cycle the clock until execution finishes
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 4; i++) {
         printf("\ncycle: %i\n", i);
 
-        //cycleIssueUnit(cpu->issueUnit);
+        cycleIssueUnit(cpu->issueUnit, cpu->registerFile, cpu->robTable, cpu->resStationTable, cpu->regTable, cpu->stallStats);
+        printDecodeUnitOutputQueue(cpu);
+        printRegisterStatusTable(cpu->regTable);
+        printROBStatusTable(cpu->robTable);
+        printResStationStatusTable(cpu->resStationTable);
+
         cycleDecodeUnit(cpu->decodeUnit);
         printFreeList(cpu->decodeUnit);
         printMapTable(cpu->decodeUnit);
@@ -158,4 +178,6 @@ void executeCPU(CPU *cpu) {
         // break;
         cycle++;
     }
+
+    printStallStats(cpu->stallStats);
 }
