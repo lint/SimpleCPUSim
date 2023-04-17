@@ -7,6 +7,7 @@
 #include "memory/memory.h"
 #include "stage_units/stage_units.h"
 #include "status_tables/status_tables.h"
+#include "functional_units/functional_units.h"
 
 // create new stall statistics struct
 void initStallStats(StallStats *stallStats) {
@@ -42,7 +43,7 @@ void initCPU(CPU *cpu, Params *params) {
     cpu->regTable = malloc(sizeof(RegisterStatusTable));
     initRegisterStatusTable(cpu->regTable);
 
-    // initialize functional units
+    /* initialize stage units */
 
     // initialize instruction fetch buffer
     Instruction **instFetchBuffer = calloc(params->NF, sizeof(Instruction *));
@@ -63,6 +64,11 @@ void initCPU(CPU *cpu, Params *params) {
 
     cpu->issueUnit = malloc(sizeof(IssueUnit));
     initIssueUnit(cpu->issueUnit, params->NW, params->NI, instDecodeQueue, numInstsInDecodeQueue);
+
+    /* initialize functional units */
+
+    cpu->intFU = malloc(sizeof(IntFunctionalUnit));
+    initIntFunctionalUnit(cpu->intFU);
 }
 
 // free any elements of the CPU that were stored on the heap
@@ -113,6 +119,11 @@ void teardownCPU(CPU *cpu) {
         free(cpu->issueUnit);
     }
 
+    if (cpu->intFU) {
+        teardownIntFunctionalUnit(cpu->intFU);
+        free(cpu->intFU);
+    }
+
     // make sure to free fetch buffer and decode queue
 }
 
@@ -145,10 +156,19 @@ void printDecodeUnitOutputQueue(CPU *cpu) {
     printf("\n");
 }
 
+// helper method to print the current state of the number of tracked stalls
 void printStallStats(StallStats *stallStats) {
     printf("\nstall statistics:\n");
     printf("\tstalls due to full ROB: %i\n", stallStats->fullROBStalls);
     printf("\tstalls due to full reservation stations: %i\n", stallStats->fullResStationStalls);
+}
+
+// perform cycle operations for each functional unit
+void cycleFunctionalUnits(CPU *cpu) {
+
+    printf("\nperforming functional unit operations...\n");
+    cycleIntFunctionalUnit(cpu->intFU, cpu->resStationTable, cpu->robTable);
+    printIntFunctionalUnit(cpu->intFU);
 }
 
 // start executing instructions on the CPU
@@ -159,6 +179,8 @@ void executeCPU(CPU *cpu) {
     // infinite loop to cycle the clock until execution finishes
     for (int i = 0; i < 4; i++) {
         printf("\ncycle: %i\n", i);
+
+        cycleFunctionalUnits(cpu);
 
         cycleIssueUnit(cpu->issueUnit, cpu->registerFile, cpu->robTable, cpu->resStationTable, cpu->regTable, cpu->stallStats);
         printDecodeUnitOutputQueue(cpu);

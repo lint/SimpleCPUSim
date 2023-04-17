@@ -10,6 +10,7 @@ typedef struct IssueUnit IssueUnit;
 typedef struct ROBStatusTable ROBStatusTable;
 typedef struct RegisterStatusTable RegisterStatusTable;
 typedef struct ResStationStatusTable ResStationStatusTable;
+typedef struct IntFunctionalUnit IntFunctionalUnit;
 
 // struct containing information about stall statistics
 typedef struct StallStats {
@@ -36,6 +37,8 @@ typedef struct CPU {
     FetchUnit *fetchUnit;
     DecodeUnit *decodeUnit;
     IssueUnit *issueUnit;
+
+    IntFunctionalUnit *intFU;
 
 } CPU;
 
