@@ -85,14 +85,14 @@ void printMapTable(DecodeUnit *decodeUnit) {
 
         if (curNode) {
 
-            printf("\t%i: ", i);
+            printf("\t%s: ", registerEnumToString(i));
             
             while (curNode->next) {
-                printf("%i -> ", curNode->reg);
+                printf("%s -> ", physicalRegisterEnumToString(curNode->reg));
                 curNode = curNode->next;
             }
 
-            printf("%i\n", curNode->reg);
+            printf("%s\n", physicalRegisterEnumToString(curNode->reg));
         }
     }
 }
@@ -106,11 +106,11 @@ void printFreeList(DecodeUnit *decodeUnit) {
 
     if (curNode) {
         while (curNode->next) {
-            printf("%i -> ", curNode->reg);
+            printf("%s -> ", physicalRegisterEnumToString(curNode->reg));
             curNode = curNode->next;
         }
 
-        printf("%i\n", curNode->reg);
+        printf("%s\n", physicalRegisterEnumToString(curNode->reg));
     } else {
         printf("none\n");
     }
