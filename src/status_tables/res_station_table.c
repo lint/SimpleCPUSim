@@ -173,38 +173,56 @@ void teardownResStationStatusTable(ResStationStatusTable *resStationTable) {
     }
 }
 
+// returns the number of reservation stations for a given functional unit
+int numResStationsForFunctionalUnit(ResStationStatusTable *resStationTable, enum FunctionalUnitType fuType) {
+    if (fuType == FUType_INT) {
+        return resStationTable->numIntStations;
+    } else if (fuType == FUType_LOAD) {
+        return resStationTable->numLoadStations;
+    } else if (fuType == FUType_LOAD) {
+        return resStationTable->numStoreStations;
+    } else if (fuType == FUType_FPAdd) {
+        return resStationTable->numFPAddStations;
+    } else if (fuType == FUType_FPMult) {
+        return resStationTable->numFPMultStations;
+    } else if (fuType == FUType_FPDiv) {
+        return resStationTable->numFPDivStations;
+    } else if (fuType == FUType_BU) {
+        return resStationTable->numBUStations;
+    } else {
+        printf("error: invalid FunctionalUnitType used while getting number of reservation stations...\n");
+        exit(1);
+    }
+}
+
+// returns the reservation station entry list for a given functional unit
+ResStationStatusTableEntry **resStationEntriesForFunctionalUnit(ResStationStatusTable *resStationTable, enum FunctionalUnitType fuType) {
+    if (fuType == FUType_INT) {
+        return resStationTable->intEntries;
+    } else if (fuType == FUType_LOAD) {
+        return resStationTable->loadEntries;
+    } else if (fuType == FUType_LOAD) {
+        return resStationTable->storeEntries;
+    } else if (fuType == FUType_FPAdd) {
+        return resStationTable->fpAddEntries;
+    } else if (fuType == FUType_FPMult) {
+        return resStationTable->fpMultEntries;
+    } else if (fuType == FUType_FPDiv) {
+        return resStationTable->fpDivEntries;
+    } else if (fuType == FUType_BU) {
+        return resStationTable->buEntries;
+    } else {
+        printf("error: invalid FunctionalUnitType used while get reservation station entries array...\n");
+        exit(1);
+    }
+}
+
 // returns the index of a free INT reservation station if one is available, otherwise return -1
 int indexForFreeResStation(ResStationStatusTable *resStationTable, enum FunctionalUnitType fuType) {
 
-    int numStations = -1;
-    ResStationStatusTableEntry **entries = NULL;
-
     // get the number of reservation stations and the entry array for the given functional unit type
-    if (fuType == FUType_INT) {
-        numStations = resStationTable->numIntStations;
-        entries = resStationTable->intEntries;
-    } else if (fuType == FUType_LOAD) {
-        numStations = resStationTable->numLoadStations;
-        entries = resStationTable->loadEntries;
-    } else if (fuType == FUType_LOAD) {
-        numStations = resStationTable->numStoreStations;
-        entries = resStationTable->storeEntries;
-    } else if (fuType == FUType_FPAdd) {
-        numStations = resStationTable->numFPAddStations;
-        entries = resStationTable->fpAddEntries;
-    } else if (fuType == FUType_FPMult) {
-        numStations = resStationTable->numFPMultStations;
-        entries = resStationTable->fpMultEntries;
-    } else if (fuType == FUType_FPDiv) {
-        numStations = resStationTable->numFPDivStations;
-        entries = resStationTable->fpDivEntries;
-    } else if (fuType == FUType_BU) {
-        numStations = resStationTable->numBUStations;
-        entries = resStationTable->buEntries;
-    } else {
-        printf("error: invalid FunctionalUnitType used while searching for free reservation station...\n");
-        exit(1);
-    }
+    int numStations = numResStationsForFunctionalUnit(resStationTable, fuType);
+    ResStationStatusTableEntry **entries = resStationEntriesForFunctionalUnit(resStationTable, fuType);
     
     // iterate over every reservation station for the given functional unit
     for (int i = 0; i < numStations; i++) {
@@ -251,6 +269,25 @@ int indexForFreeResStationForInstruction(ResStationStatusTable *resStationTable,
 // returns 1 if there is a reservation station avaialble for the given instruction, 0 if not
 int isFreeResStationForInstruction(ResStationStatusTable *resStationTable, Instruction *inst) {
     return indexForFreeResStationForInstruction(resStationTable, inst) != -1;
+}
+
+// returns the number of filled reservation stations for a given functional unit
+int numBusyResStationsForFunctionalUnit(ResStationStatusTable *resStationTable, enum FunctionalUnitType fuType) {
+    
+    // get the number of reservation stations and the entry array for the given functional unit type
+    int numStations = numResStationsForFunctionalUnit(resStationTable, fuType);
+    ResStationStatusTableEntry **entries = resStationEntriesForFunctionalUnit(resStationTable, fuType);
+
+    int numBusyStations = 0;
+
+    // iterate over the current reservation station entries checking for ones that are busy
+    for (int i = 0; i < numStations; i++) {
+        if (entries[i]->busy) {
+            numBusyStations++;
+        }
+    }
+
+    return numBusyStations;
 }
 
 // updates the reservation station status table for a given instruction

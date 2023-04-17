@@ -48,6 +48,8 @@ typedef struct ResStationStatusTable {
 // reservation status table methods
 void initResStationStatusTable(ResStationStatusTable *resStationTable);
 void teardownResStationStatusTable(ResStationStatusTable *resStationTable);
+int numResStationsForFunctionalUnit(ResStationStatusTable *resStationTable, enum FunctionalUnitType fuType);
+ResStationStatusTableEntry **resStationEntriesForFunctionalUnit(ResStationStatusTable *resStationTable, enum FunctionalUnitType fuType);
 int indexForFreeResStation(ResStationStatusTable *resStationTable, enum FunctionalUnitType fuType);
 int indexForFreeResStationForInstruction(ResStationStatusTable *resStationTable, Instruction *inst);
 int isFreeResStationForInstruction(ResStationStatusTable *resStationTable, Instruction *inst);
