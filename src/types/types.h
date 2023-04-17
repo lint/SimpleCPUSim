@@ -61,9 +61,51 @@ typedef struct Instruction {
     int branchTargetAddr;
     char branchTargetLabel[256];
     char label[256];
+    int addr; // address in the instruction cache
 } Instruction;
+
+// enum representing the different functional unit types
+enum FunctionalUnitType {
+    FUType_NONE = -1,
+    FUType_INT,
+    FUType_LOAD,
+    FUType_STORE,
+    FUType_FPAdd,
+    FUType_FPMult,
+    FUType_FPDiv,
+    FUType_BU
+};
+
+// enum representing operations that different functional units can perform
+enum FunctionalUnitOperations {
+    FUOp_NONE = -1,
+    FUOp_ADD,
+    FUOp_SLT,
+    FUOp_SUB
+};
+
+// enum represneting the different states that an instruction can be in
+enum InstructionState {
+    STATE_NONE = -1,
+    STATE_ISSUED,
+    STATE_EXECUTING,
+    STATE_WROTE_RESULT,
+    STATE_COMMIT
+};
+
+// enum representing the different types of values that an instruction can result in
+enum InstructionResultValueType {
+    INST_VAL_NONE = -1,
+    INST_VAL_INT,
+    INST_VAL_FLOAT
+};
 
 // helper methods
 enum InstructionType stringToInstructionType(char *s);
 enum RegisterName stringToRegisterName(char *s);
+char *registerEnumToString(enum RegisterName reg);
+char *physicalRegisterEnumToString(enum PhysicalRegisterName reg);
 void printInstruction(Instruction inst);
+char *instStateToString(enum InstructionState state);
+char *instResultTypeToString(enum InstructionResultValueType type);
+char *fuOpToString(enum FunctionalUnitOperations op);

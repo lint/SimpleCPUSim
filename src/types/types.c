@@ -1,8 +1,10 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "types.h"
 
+// converts a string to the instruction type enum
 enum InstructionType stringToInstructionType(char *s) {
 
     // printf("getting type for: %s\n", s);
@@ -32,6 +34,7 @@ enum InstructionType stringToInstructionType(char *s) {
     }
 }
 
+// converts a string to the register name enum
 enum RegisterName stringToRegisterName(char *s) {
 
     // printf("getting register enum for: %s\n", s);
@@ -52,6 +55,79 @@ enum RegisterName stringToRegisterName(char *s) {
     return (enum RegisterName)(regNum + offset);
 }
 
+// converts the register name enum to string
+char *registerEnumToString(enum RegisterName reg) {
+
+    if (reg == PC) {
+        return "PC";
+    } else if (reg == ZERO) {
+        return "$0";
+    }
+
+    char *str = malloc(4 * sizeof(char)); // potential memory leak if not freed
+    char regType = reg < 32 ? 'R' : 'F';
+    int regNum = reg < 32 ? reg : 32 - reg;
+
+    sprintf(str, "%c%d", regType, regNum);
+
+    return str;
+}
+
+// converts the physical register name enum to string
+char *physicalRegisterEnumToString(enum PhysicalRegisterName reg) {
+
+    if (reg == PHYS_PC) {
+        return "PHYS_PC";
+    } else if (reg == PHYS_ZERO) {
+        return "p_$0";
+    }
+
+    char *str = malloc(4 * sizeof(char));
+    sprintf(str, "p%d", reg);
+    
+    return str;
+}
+
+// converts the instruction state enum to a string
+char *instStateToString(enum InstructionState state) {
+    if (state == STATE_ISSUED) {
+        return "ISSUED";
+    } else if (state == STATE_EXECUTING) {
+        return "EXECUTING";
+    } else if (state == STATE_WROTE_RESULT) {
+        return "WROTE_RESULT";
+    } else if (state == STATE_COMMIT) {
+        return "COMMIT";
+    } else {
+        return "NONE";
+    }
+}
+
+// converts the instruction result value type to string
+char *instResultTypeToString(enum InstructionResultValueType type) {
+    if (type == INST_VAL_FLOAT) {
+        return "float";
+    } else if (type == INST_VAL_INT) {
+        return "int";
+    } else {
+        return "NONE";
+    }
+}
+
+// converts the functional unit operations enum to string
+char *fuOpToString(enum FunctionalUnitOperations op) {
+    if (op == FUOp_ADD) {
+        return "add";
+    } else if (op == FUOp_SUB) {
+        return "sub";
+    } else if (op == FUOp_SLT) {
+        return "slt";
+    } else {
+        return "NONE";
+    }
+}
+
+// prints the contents of an instruction
 void printInstruction(Instruction inst) {
     printf("instruction: label: %s, type: %i, imm: %i, destReg: %i, sourceReg1: %i, sourceReg2: %i, destPhysReg: %i, source1PhysReg: %i, source2PhysReg: %i, branchTargetAddr: %i, branchTargetLabel: %s\n", 
                 inst.label, inst.type, inst.imm, inst.destReg, inst.source1Reg, inst.source2Reg, inst.destPhysReg, inst.source1PhysReg, inst.source2PhysReg, inst.branchTargetAddr, inst.branchTargetLabel);
