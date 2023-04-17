@@ -108,4 +108,10 @@ void cycleIntFunctionalUnit(IntFunctionalUnit *intFU, ResStationStatusTable *res
 
     // move the next result into the first stage element
     intFU->stages[0] = nextResult;
+
+    // forward most recently completed result to reservation stations
+    // IntFUResult *newestResult = intFU->stages[intFU->latency-1];
+    // if (newestResult) {
+    //     forwardIntResultToResStationStatusTable(resStationTable, newestResult);
+    // }
 }

@@ -51,8 +51,14 @@ void cycleIssueUnit(IssueUnit *issueUnit, RegisterFile *regFile,
         // issue instruction if free slot in ROB and reservation station is available
         if (isFreeEntryInROB(robTable) && isFreeResStationForInstruction(resStationTable, inst)) {
             numInstsIssued++;
+            
+            // add entry in the ROB for the given instruction and get the index it is stored at
             int robIndex = addInstToROB(robTable, inst);
+
+            // add the values to the reservation station (just updating the reservation station table)
             addInstToResStation(resStationTable, regTable, regFile, inst, robIndex);
+
+            // update the register status table to have the destination of the instruction
             setRegisterStatusTableEntryVal(regTable, inst->destPhysReg, robIndex);
         } else {
 
