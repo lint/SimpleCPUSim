@@ -59,6 +59,8 @@ void addInstructionToCache(InstCache *instCache, Instruction inst) {
     // extend the instruction cache if not enough space for a new instruction
     extendInstCacheIfNeeded(instCache);
 
+    inst.addr = instCache->numInsts * 4; // since an instruction is simulated as 4 bytes in memory
+
     // store the instruction
     instCache->cache[instCache->numInsts++] = inst;
 }

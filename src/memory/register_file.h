@@ -1,10 +1,17 @@
 
 enum PhysicalRegisterName; // forward declaration
 
+typedef struct RegisterFileEntry {
+    int intVal;
+    float floatVal;
+    int valType; // enum InstructionResultValueType
+} RegisterFileEntry;
+
 // struct representing a register file
 typedef struct RegisterFile {
 
-    int *data;
+    RegisterFileEntry **entries;
+    int numEntries;
     int pc;
 
 } RegisterFile;
@@ -12,6 +19,8 @@ typedef struct RegisterFile {
 // register file methods
 void initRegisterFile(RegisterFile *registerFile);
 void teardownRegisterFile(RegisterFile *registerFile);
-int readRegisterFile(RegisterFile *registerFile, enum PhysicalRegisterName reg);
-void writeRegisterFile(RegisterFile *registerFile, enum PhysicalRegisterName reg, int value);
+int readRegisterFileInt(RegisterFile *registerFile, enum PhysicalRegisterName reg);
+float readRegisterFileFloat(RegisterFile *registerFile, enum PhysicalRegisterName reg);
+void writeRegisterFileInt(RegisterFile *registerFile, enum PhysicalRegisterName reg, int value);
+void writeRegisterFileFloat(RegisterFile *registerFile, enum PhysicalRegisterName reg, float value);
 void printRegisterFile(RegisterFile *registerFile);
