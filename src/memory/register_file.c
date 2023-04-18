@@ -4,6 +4,7 @@
 #include <string.h>
 #include "register_file.h"
 #include "../types/types.h"
+#include "../stage_units/stage_units.h"
 
 // intializes a struct representing a register file
 void initRegisterFile(RegisterFile *registerFile) {
@@ -124,4 +125,25 @@ void writeRegisterFileFloat(RegisterFile *registerFile, enum PhysicalRegisterNam
 // prints the current contents of the register file
 void printRegisterFile(RegisterFile *registerFile) {
 
+    printf("register file (values casted to int): \n");
+    printf("\t$0: %i\n", readRegisterFileInt(registerFile, PHYS_ZERO));
+    printf("\tPC: %i\n", readRegisterFileInt(registerFile, PHYS_PC));
+
+    for (int i = 0; i < PHYS_RN_SIZE; i++) {
+        printf("\t%s: %i\n", physicalRegisterEnumToString(i), readRegisterFileInt(registerFile, i));
+    }
+}
+
+// prints the current contents of the register file showing architecture registers
+void printRegisterFileArchRegs(RegisterFile *registerFile, DecodeUnit *decodeUnit) {
+    
+    printf("register file (values casted to int): \n");
+    printf("\t$0: %i\n", readRegisterFileInt(registerFile, PHYS_ZERO));
+    printf("\tPC: %i\n", readRegisterFileInt(registerFile, PHYS_PC));
+
+    for (int i = 0; i < RN_SIZE; i++) {
+        enum PhysicalRegisterName mappedPhysReg = readMapTable(decodeUnit, i);
+        int val = mappedPhysReg == NONEPR ? 0 : readRegisterFileInt(registerFile, mappedPhysReg);
+        printf("\t%s: %i\n", registerEnumToString(i), val);
+    }
 }

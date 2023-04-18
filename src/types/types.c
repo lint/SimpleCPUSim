@@ -66,7 +66,7 @@ char *registerEnumToString(enum RegisterName reg) {
 
     char *str = malloc(4 * sizeof(char)); // potential memory leak if not freed
     char regType = reg < 32 ? 'R' : 'F';
-    int regNum = reg < 32 ? reg : 32 - reg;
+    int regNum = reg < 32 ? reg : reg - 32;
 
     sprintf(str, "%c%d", regType, regNum);
 
@@ -84,7 +84,7 @@ char *physicalRegisterEnumToString(enum PhysicalRegisterName reg) {
 
     char *str = malloc(4 * sizeof(char));
     sprintf(str, "p%d", reg);
-    
+
     return str;
 }
 
@@ -122,6 +122,38 @@ char *fuOpToString(enum FunctionalUnitOperations op) {
         return "sub";
     } else if (op == FUOp_SLT) {
         return "slt";
+    } else {
+        return "NONE";
+    }
+}
+
+// converts the functional unit type to string
+char *fuTypeToString(enum FunctionalUnitType fuType) {
+    if (fuType == FUType_LOAD) {
+        return "FU_FSD";
+    } else if (fuType == FUType_STORE) {
+        return "FU_STORE";
+    } else if (fuType == FUType_INT) {
+        return "FU_INT";
+    } else if (fuType == FUType_FPAdd) {
+        return "FU_FPADD";
+    } else if (fuType == FUType_FPMult) {
+        return "FU_FPMULT";
+    } else if (fuType == FUType_FPDiv) {
+        return "FU_FPDIV";
+    } else if (fuType == FUType_BU) {
+        return "FU_BU";
+    } else {
+        return "NONE";
+    }
+}
+
+// converts the val produced by enum to string
+char *valProducedByToString(enum ValProducedBy producedBy) {
+    if (producedBy == VAL_FROM_FU) {
+        return "VAL_FROM_FU";
+    } else if (producedBy == VAL_FROM_ROB) {
+        return "VAL_FROM_ROB";
     } else {
         return "NONE";
     }

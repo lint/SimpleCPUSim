@@ -218,6 +218,22 @@ ResStationStatusTableEntry **resStationEntriesForFunctionalUnit(ResStationStatus
     }
 }
 
+ResStationStatusTableEntry *resStationEntryForFunctionalUnitWithDestROB(ResStationStatusTable *resStationTable, int fuType, int destROB) {
+
+    ResStationStatusTableEntry **entries = resStationEntriesForFunctionalUnit(resStationTable, fuType);
+    int numEntries = numResStationsForFunctionalUnit(resStationTable, fuType);
+    
+    for (int i = 0; i < numEntries; i++) {
+        ResStationStatusTableEntry *entry = entries[i];
+        
+        if (entry->dest == destROB) {
+            return entry;
+        }
+    }
+
+    return NULL;
+}
+
 // returns the reservation station entry list for a given instruction
 ResStationStatusTableEntry **resStationEntriesForInstruction(ResStationStatusTable *resStationTable, Instruction *inst) {
 
@@ -487,12 +503,12 @@ void forwardFloatResultToResStationStatusTable(ResStationStatusTable *resStation
     printf("forwarding float result: %f robIndex: %i to reservation stations\n", resultVal, robIndex);
 
     // forward int result to reservation stations that can use int registers
-    processIntForwardingForResStationEntries(resStationTable->loadEntries, resStationTable->numLoadStations, floatResult);
-    processIntForwardingForResStationEntries(resStationTable->storeEntries, resStationTable->numStoreStations, floatResult);
-    processIntForwardingForResStationEntries(resStationTable->buEntries, resStationTable->numBUStations, floatResult);
-    processIntForwardingForResStationEntries(resStationTable->fpAddEntries, resStationTable->numFPAddStations, floatResult);
-    processIntForwardingForResStationEntries(resStationTable->fpMultEntries, resStationTable->numFPMultStations, floatResult);
-    processIntForwardingForResStationEntries(resStationTable->fpDivEntries, resStationTable->numFPDivStations, floatResult);
+    processFloatForwardingForResStationEntries(resStationTable->loadEntries, resStationTable->numLoadStations, floatResult);
+    processFloatForwardingForResStationEntries(resStationTable->storeEntries, resStationTable->numStoreStations, floatResult);
+    processFloatForwardingForResStationEntries(resStationTable->buEntries, resStationTable->numBUStations, floatResult);
+    processFloatForwardingForResStationEntries(resStationTable->fpAddEntries, resStationTable->numFPAddStations, floatResult);
+    processFloatForwardingForResStationEntries(resStationTable->fpMultEntries, resStationTable->numFPMultStations, floatResult);
+    processFloatForwardingForResStationEntries(resStationTable->fpDivEntries, resStationTable->numFPDivStations, floatResult);
 }
 
 // prints the contents of the reservation station status table

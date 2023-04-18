@@ -53,6 +53,7 @@ void teardownResStationStatusTable(ResStationStatusTable *resStationTable);
 int numResStationsForFunctionalUnit(ResStationStatusTable *resStationTable, int fuType);
 int numBusyResStationsForFunctionalUnit(ResStationStatusTable *resStationTable, int fuType);
 ResStationStatusTableEntry **resStationEntriesForFunctionalUnit(ResStationStatusTable *resStationTable, int fuType);
+ResStationStatusTableEntry *resStationEntryForFunctionalUnitWithDestROB(ResStationStatusTable *resStationTable, int fuType, int destROB);
 ResStationStatusTableEntry **resStationEntriesForInstruction(ResStationStatusTable *resStationTable, Instruction *inst);
 int indexForFreeResStation(ResStationStatusTable *resStationTable, int fuType);
 int indexForFreeResStationForInstruction(ResStationStatusTable *resStationTable, Instruction *inst);

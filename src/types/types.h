@@ -1,4 +1,7 @@
 
+#include "functional_unit_types.h"
+#include "status_table_types.h"
+
 // struct containing parameters read from a config file
 typedef struct Params {
     int NF; // instructions fetched per cycle
@@ -100,6 +103,12 @@ enum InstructionResultValueType {
     INST_VAL_FLOAT
 };
 
+enum ValProducedBy {
+    VAL_FROM_NONE = -1,
+    VAL_FROM_ROB,
+    VAL_FROM_FU
+};
+
 // helper methods
 enum InstructionType stringToInstructionType(char *s);
 enum RegisterName stringToRegisterName(char *s);
@@ -109,3 +118,5 @@ void printInstruction(Instruction inst);
 char *instStateToString(enum InstructionState state);
 char *instResultTypeToString(enum InstructionResultValueType type);
 char *fuOpToString(enum FunctionalUnitOperations op);
+char *fuTypeToString(enum FunctionalUnitType fuType);
+char *valProducedByToString(enum ValProducedBy producedBy);

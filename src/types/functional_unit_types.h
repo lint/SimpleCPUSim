@@ -1,4 +1,7 @@
 
+// forward declarations
+typedef struct IntFunctionalUnit IntFunctionalUnit;
+
 // struct containing information for an INT functional unit operation
 typedef struct IntFUResult {
     int source1;
@@ -14,3 +17,9 @@ typedef struct FloatFUResult {
     float result;
     int destROB;
 } FloatFUResult;
+
+// struct that bundles the functional units together 
+typedef struct FunctionalUnits {
+    IntFunctionalUnit *intFU;
+
+} FunctionalUnits;

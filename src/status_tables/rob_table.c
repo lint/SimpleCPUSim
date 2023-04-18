@@ -92,8 +92,7 @@ int addInstToROB(ROBStatusTable *robTable, Instruction *inst) {
 // prints the contents of the ROB status table
 void printROBStatusTable(ROBStatusTable *robTable) {
     
-    printf("ROB status table:\n");
-    printf("\thead entry index: %i\n", robTable->headEntryIndex);
+    printf("ROB status table: head entry index: %i\n", robTable->headEntryIndex);
 
     for (int i = 0; i < robTable->NR; i++) {
         ROBStatusTableEntry *entry = robTable->entries[i];

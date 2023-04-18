@@ -7,9 +7,12 @@ typedef struct RegisterFile RegisterFile;
 typedef struct FetchUnit FetchUnit;
 typedef struct DecodeUnit DecodeUnit;
 typedef struct IssueUnit IssueUnit;
+typedef struct WritebackUnit WritebackUnit;
+typedef struct StatusTables StatusTables;
 typedef struct ROBStatusTable ROBStatusTable;
 typedef struct RegisterStatusTable RegisterStatusTable;
 typedef struct ResStationStatusTable ResStationStatusTable;
+typedef struct FunctionalUnits FunctionalUnits;
 typedef struct IntFunctionalUnit IntFunctionalUnit;
 
 // struct containing information about stall statistics
@@ -30,15 +33,13 @@ typedef struct CPU {
     DataCache *dataCache;
     RegisterFile *registerFile;
 
-    ROBStatusTable *robTable;
-    RegisterStatusTable *regTable;
-    ResStationStatusTable *resStationTable;
-
     FetchUnit *fetchUnit;
     DecodeUnit *decodeUnit;
     IssueUnit *issueUnit;
+    WritebackUnit *writebackUnit;
 
-    IntFunctionalUnit *intFU;
+    FunctionalUnits *functionalUnits;
+    StatusTables *statusTables;
 
 } CPU;
 

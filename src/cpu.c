@@ -34,14 +34,17 @@ void initCPU(CPU *cpu, Params *params) {
     initRegisterFile(cpu->registerFile);
 
     // initialize status tables
-    cpu->robTable = malloc(sizeof(ROBStatusTable));
-    initROBStatusTable(cpu->robTable, params->NR);
+    StatusTables *statusTables = malloc(sizeof(StatusTables));
+    cpu->statusTables = statusTables;
 
-    cpu->resStationTable = malloc(sizeof(ResStationStatusTable));
-    initResStationStatusTable(cpu->resStationTable);
+    statusTables->robTable = malloc(sizeof(ROBStatusTable));
+    initROBStatusTable(statusTables->robTable, params->NR);
 
-    cpu->regTable = malloc(sizeof(RegisterStatusTable));
-    initRegisterStatusTable(cpu->regTable);
+    statusTables->resStationTable = malloc(sizeof(ResStationStatusTable));
+    initResStationStatusTable(statusTables->resStationTable);
+
+    statusTables->regTable = malloc(sizeof(RegisterStatusTable));
+    initRegisterStatusTable(statusTables->regTable);
 
     /* initialize stage units */
 
@@ -65,10 +68,17 @@ void initCPU(CPU *cpu, Params *params) {
     cpu->issueUnit = malloc(sizeof(IssueUnit));
     initIssueUnit(cpu->issueUnit, params->NW, params->NI, instDecodeQueue, numInstsInDecodeQueue);
 
+    cpu->writebackUnit = malloc(sizeof(WritebackUnit));
+    initWritebackUnit(cpu->writebackUnit, params->NB, params->NR);
+
     /* initialize functional units */
 
-    cpu->intFU = malloc(sizeof(IntFunctionalUnit));
-    initIntFunctionalUnit(cpu->intFU);
+    FunctionalUnits *fus = malloc(sizeof(FunctionalUnits));
+    cpu->functionalUnits = fus;
+
+    IntFunctionalUnit *intFU = malloc(sizeof(IntFunctionalUnit));
+    initIntFunctionalUnit(intFU);
+    fus->intFU = intFU;
 }
 
 // free any elements of the CPU that were stored on the heap
@@ -89,21 +99,6 @@ void teardownCPU(CPU *cpu) {
         free(cpu->registerFile);
     }
 
-    if (cpu->robTable) {
-        teardownROBStatusTable(cpu->robTable);
-        free(cpu->robTable);
-    }
-
-    if (cpu->regTable) {
-        teardownRegisterStatusTable(cpu->regTable);
-        free(cpu->regTable);
-    }
-
-    if (cpu->resStationTable) {
-        teardownResStationStatusTable(cpu->resStationTable);
-        free(cpu->resStationTable);
-    }
-
     if (cpu->fetchUnit) {
         teardownFetchUnit(cpu->fetchUnit);
         free(cpu->fetchUnit);
@@ -119,9 +114,37 @@ void teardownCPU(CPU *cpu) {
         free(cpu->issueUnit);
     }
 
-    if (cpu->intFU) {
-        teardownIntFunctionalUnit(cpu->intFU);
-        free(cpu->intFU);
+    if (cpu->writebackUnit) {
+        teardownWritebackUnit(cpu->writebackUnit);
+        free(cpu->writebackUnit);
+    }
+
+    if (cpu->functionalUnits) {
+        if (cpu->functionalUnits->intFU) {
+            teardownIntFunctionalUnit(cpu->functionalUnits->intFU);
+            free(cpu->functionalUnits->intFU);
+        }
+
+        free(cpu->functionalUnits);
+    }
+
+    if (cpu->statusTables) {
+        
+        if (cpu->statusTables->robTable) {
+            teardownROBStatusTable(cpu->statusTables->robTable);
+            free(cpu->statusTables->robTable);
+        }
+
+        if (cpu->statusTables->regTable) {
+            teardownRegisterStatusTable(cpu->statusTables->regTable);
+            free(cpu->statusTables->regTable);
+        }
+
+        if (cpu->statusTables->resStationTable) {
+            teardownResStationStatusTable(cpu->statusTables->resStationTable);
+            free(cpu->statusTables->resStationTable);
+        }
+        free(cpu->statusTables);
     }
 
     // make sure to free fetch buffer and decode queue
@@ -156,6 +179,13 @@ void printDecodeUnitOutputQueue(CPU *cpu) {
     printf("\n");
 }
 
+// helper method to print the contents of the all status tables
+void printStatusTables(CPU *cpu) {
+    printRegisterStatusTable(cpu->statusTables->regTable);
+    printROBStatusTable(cpu->statusTables->robTable);
+    printResStationStatusTable(cpu->statusTables->resStationTable);
+}
+
 // helper method to print the current state of the number of tracked stalls
 void printStallStats(StallStats *stallStats) {
     printf("\nstall statistics:\n");
@@ -167,8 +197,8 @@ void printStallStats(StallStats *stallStats) {
 void cycleFunctionalUnits(CPU *cpu) {
 
     printf("\nperforming functional unit operations...\n");
-    cycleIntFunctionalUnit(cpu->intFU, cpu->resStationTable, cpu->robTable);
-    printIntFunctionalUnit(cpu->intFU);
+    cycleIntFunctionalUnit(cpu->functionalUnits->intFU, cpu->statusTables);
+    printIntFunctionalUnit(cpu->functionalUnits->intFU);
 }
 
 // start executing instructions on the CPU
@@ -177,16 +207,18 @@ void executeCPU(CPU *cpu) {
     int cycle = 0;
 
     // infinite loop to cycle the clock until execution finishes
-    for (int i = 0; i < 4; i++) {
+    for (int i = 1; i <= 5; i++) {
         printf("\ncycle: %i\n", i);
+
+        cycleWritebackUnit(cpu->writebackUnit, cpu->statusTables, cpu->functionalUnits);
+        printWritebackUnitCDBS(cpu->writebackUnit);
+        printStatusTables(cpu);
 
         cycleFunctionalUnits(cpu);
 
-        cycleIssueUnit(cpu->issueUnit, cpu->registerFile, cpu->robTable, cpu->resStationTable, cpu->regTable, cpu->stallStats);
+        cycleIssueUnit(cpu->issueUnit, cpu->statusTables, cpu->registerFile, cpu->stallStats);
         printDecodeUnitOutputQueue(cpu);
-        printRegisterStatusTable(cpu->regTable);
-        printROBStatusTable(cpu->robTable);
-        printResStationStatusTable(cpu->resStationTable);
+        printStatusTables(cpu);
 
         cycleDecodeUnit(cpu->decodeUnit);
         printFreeList(cpu->decodeUnit);
@@ -200,6 +232,8 @@ void executeCPU(CPU *cpu) {
         // break;
         cycle++;
     }
+
+    printRegisterFileArchRegs(cpu->registerFile, cpu->decodeUnit);
 
     printStallStats(cpu->stallStats);
 }

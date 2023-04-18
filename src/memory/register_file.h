@@ -1,5 +1,7 @@
 
-enum PhysicalRegisterName; // forward declaration
+// forward declarations
+enum PhysicalRegisterName; // TODO: remove this?
+typedef struct DecodeUnit DecodeUnit;
 
 typedef struct RegisterFileEntry {
     int intVal;
@@ -24,3 +26,4 @@ float readRegisterFileFloat(RegisterFile *registerFile, enum PhysicalRegisterNam
 void writeRegisterFileInt(RegisterFile *registerFile, enum PhysicalRegisterName reg, int value);
 void writeRegisterFileFloat(RegisterFile *registerFile, enum PhysicalRegisterName reg, float value);
 void printRegisterFile(RegisterFile *registerFile);
+void printRegisterFileArchRegs(RegisterFile *registerFile, DecodeUnit *decodeUnit);

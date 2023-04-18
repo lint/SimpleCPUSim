@@ -29,11 +29,13 @@ void teardownIssueUnit(IssueUnit *issueUnit) {
 }
 
 // execute issue unit's operations during a cycle
-void cycleIssueUnit(IssueUnit *issueUnit, RegisterFile *regFile, 
-    ROBStatusTable *robTable, ResStationStatusTable *resStationTable, RegisterStatusTable *regTable, 
-    StallStats *stallStats) {
+void cycleIssueUnit(IssueUnit *issueUnit, StatusTables *statusTables, RegisterFile *regFile, StallStats *stallStats) {
 
     printf("\nperforming issue unit operations...\n");
+
+    ROBStatusTable *robTable = statusTables->robTable;
+    ResStationStatusTable *resStationTable = statusTables->resStationTable;
+    RegisterStatusTable *regTable = statusTables->regTable;
 
     int numInstsIssued = 0;
 

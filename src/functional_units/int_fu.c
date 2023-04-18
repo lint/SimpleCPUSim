@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "functional_unit_types.h"
 #include "../status_tables/status_tables.h"
 #include "../types/types.h"
 #include "int_fu.h"
@@ -15,6 +14,7 @@ void initIntFunctionalUnit(IntFunctionalUnit *intFU) {
     intFU->stages = malloc(intFU->latency * sizeof(IntFUResult *)); 
     intFU->stages[0] = NULL;
     intFU->fuType = FUType_INT;
+    intFU->isStalled = 0;
 }
 
 // free any INT functional unit elements that are stored on the heap
@@ -46,8 +46,15 @@ void printIntFunctionalUnit(IntFunctionalUnit *intFU) {
 }
 
 // perform INT functional unit operations during a cycle
-void cycleIntFunctionalUnit(IntFunctionalUnit *intFU, ResStationStatusTable *resStationTable, ROBStatusTable *robTable) {
+void cycleIntFunctionalUnit(IntFunctionalUnit *intFU, StatusTables *statusTables) {
     printf("\nperforming int functional unit operations...\n");
+
+    if (intFU->isStalled) {
+        printf("int functional unit is stalled because its result was not placed on the CDB by the writeback unit\n");
+    }
+
+    ResStationStatusTable *resStationTable = statusTables->resStationTable;
+    ROBStatusTable *robTable = statusTables->robTable;
 
     ResStationStatusTableEntry **resStationEntries = resStationEntriesForFunctionalUnit(resStationTable, intFU->fuType);
     int numResStations = numResStationsForFunctionalUnit(resStationTable, intFU->fuType);
