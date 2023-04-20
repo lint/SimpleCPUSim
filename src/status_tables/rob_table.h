@@ -1,8 +1,7 @@
 
 // forward declarations
 typedef struct Instruction Instruction;
-enum InstructionState;
-enum RegisterName;
+typedef struct ArchRegister ArchRegister;
 
 // struct representing an entry in the ROB status table
 typedef struct ROBStatusTableEntry {
@@ -11,10 +10,13 @@ typedef struct ROBStatusTableEntry {
     int busy;
     Instruction *inst;
     int state; // InstructionState enum
-    int dest; // PhysicalRegisterName enum for load and ALU operations OR WAIT address for stores as well?????
+    ArchRegister *destReg; // destination register for load and ALU operations
+    int renamedDestReg;
     int intValue;
     float floatValue;
     int instResultValueType; // InstructionResultValueType enum
+
+    // TODO: need something to store the address for stores
 
 } ROBStatusTableEntry;
 
@@ -32,3 +34,5 @@ int isFreeEntryInROB(ROBStatusTable *robTable);
 int nextFreeROBEntryIndex(ROBStatusTable *robTable);
 int addInstToROB(ROBStatusTable *robTable, Instruction *inst);
 void printROBStatusTable(ROBStatusTable *robTable);
+ROBStatusTableEntry *getHeadROBEntry(ROBStatusTable *robTable);
+int isROBEmpty(ROBStatusTable *robTable);

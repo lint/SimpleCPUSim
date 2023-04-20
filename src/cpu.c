@@ -17,6 +17,10 @@ void initStallStats(StallStats *stallStats) {
 
 // creates a new CPU struct, initializes its data structures and components, and returns it
 void initCPU(CPU *cpu, Params *params) {
+
+    cpu->cycle = 1;
+    cpu->consecEmptyROBCycles = 0;
+
     cpu->params = params;
 
     cpu->stallStats = malloc(sizeof(StallStats));
@@ -48,25 +52,18 @@ void initCPU(CPU *cpu, Params *params) {
 
     /* initialize stage units */
 
-    // initialize instruction fetch buffer
+    // initialize instruction fetch buffer that is shared between fetch and decode units
     Instruction **instFetchBuffer = calloc(params->NF, sizeof(Instruction *));
     int *instFetchBufferSize = malloc(sizeof(int));
     int *numInstsInFetchBuffer = malloc(sizeof(int));
     *instFetchBufferSize = params->NF;
     *numInstsInFetchBuffer = 0;
 
-    // initalize decode queue
-    Instruction **instDecodeQueue = calloc(params->NI, sizeof(Instruction *));
-    int *numInstsInDecodeQueue = malloc(sizeof(int));    
-
     cpu->fetchUnit = malloc(sizeof(FetchUnit));
     initFetchUnit(cpu->fetchUnit, params->NF, instFetchBuffer, instFetchBufferSize, numInstsInFetchBuffer);
 
     cpu->decodeUnit = malloc(sizeof(DecodeUnit));
-    initDecodeUnit(cpu->decodeUnit, params->NF, params->NI, instFetchBuffer, instFetchBufferSize, numInstsInFetchBuffer, instDecodeQueue, numInstsInDecodeQueue);
-
-    cpu->issueUnit = malloc(sizeof(IssueUnit));
-    initIssueUnit(cpu->issueUnit, params->NW, params->NI, instDecodeQueue, numInstsInDecodeQueue);
+    initDecodeUnit(cpu->decodeUnit, params->NI, params->NW, instFetchBuffer, instFetchBufferSize, numInstsInFetchBuffer);
 
     cpu->writebackUnit = malloc(sizeof(WritebackUnit));
     initWritebackUnit(cpu->writebackUnit, params->NB, params->NR);
@@ -77,8 +74,20 @@ void initCPU(CPU *cpu, Params *params) {
     cpu->functionalUnits = fus;
 
     IntFunctionalUnit *intFU = malloc(sizeof(IntFunctionalUnit));
-    initIntFunctionalUnit(intFU);
+    initIntFunctionalUnit(intFU, 1); // latency decribed in project description
     fus->intFU = intFU;
+
+    FPFunctionalUnit *fpAddFU = malloc(sizeof(FPFunctionalUnit));
+    initFPFunctionalUnit(fpAddFU, FU_TYPE_FPADD, 3); // latency decribed in project description
+    fus->fpAddFU = fpAddFU;
+
+    FPFunctionalUnit *fpMulFU = malloc(sizeof(FPFunctionalUnit));
+    initFPFunctionalUnit(fpMulFU, FU_TYPE_FPMUL, 4); // latency decribed in project description
+    fus->fpMulFU = fpMulFU;
+
+    FPFunctionalUnit *fpDivFU = malloc(sizeof(FPFunctionalUnit));
+    initFPFunctionalUnit(fpDivFU, FU_TYPE_FPDIV, 8); // latency decribed in project description
+    fus->fpDivFU = fpDivFU;
 }
 
 // free any elements of the CPU that were stored on the heap
@@ -99,6 +108,10 @@ void teardownCPU(CPU *cpu) {
         free(cpu->registerFile);
     }
 
+    if (cpu->fetchUnit->instFetchBuffer) {
+        free(cpu->fetchUnit->instFetchBuffer);
+    }
+
     if (cpu->fetchUnit) {
         teardownFetchUnit(cpu->fetchUnit);
         free(cpu->fetchUnit);
@@ -107,11 +120,6 @@ void teardownCPU(CPU *cpu) {
     if (cpu->decodeUnit) {
         teardownDecodeUnit(cpu->decodeUnit);
         free(cpu->decodeUnit);
-    }
-
-    if (cpu->issueUnit) {
-        teardownIssueUnit(cpu->issueUnit);
-        free(cpu->issueUnit);
     }
 
     if (cpu->writebackUnit) {
@@ -123,6 +131,18 @@ void teardownCPU(CPU *cpu) {
         if (cpu->functionalUnits->intFU) {
             teardownIntFunctionalUnit(cpu->functionalUnits->intFU);
             free(cpu->functionalUnits->intFU);
+        }
+        if (cpu->functionalUnits->fpAddFU) {
+            teardownFPFunctionalUnit(cpu->functionalUnits->fpAddFU);
+            free(cpu->functionalUnits->fpAddFU);
+        }
+        if (cpu->functionalUnits->fpMulFU) {
+            teardownFPFunctionalUnit(cpu->functionalUnits->fpMulFU);
+            free(cpu->functionalUnits->fpMulFU);
+        }
+        if (cpu->functionalUnits->fpDivFU) {
+            teardownFPFunctionalUnit(cpu->functionalUnits->fpDivFU);
+            free(cpu->functionalUnits->fpDivFU);
         }
 
         free(cpu->functionalUnits);
@@ -146,34 +166,16 @@ void teardownCPU(CPU *cpu) {
         }
         free(cpu->statusTables);
     }
-
-    // make sure to free fetch buffer and decode queue
 }
 
 // helper method to print the contents of the instruction fetch buffer
 void printInstructionFetchBuffer(CPU *cpu) {
 
     FetchUnit *fetchUnit = cpu->fetchUnit;
-
     printf("instruction fetch buffer: %p, size: %i, numInsts: %i, items: ", fetchUnit->instFetchBuffer, *fetchUnit->instFetchBufferSize, *fetchUnit->numInstsInBuffer);
-
+    
     for (int i = 0; i < *fetchUnit->numInstsInBuffer; i++) {
         printf("%p, ", fetchUnit->instFetchBuffer[i]);
-    }
-
-    printf("\n");
-}
-
-// helper method to print the current state of the decoded instruction queue
-void printDecodeUnitOutputQueue(CPU *cpu) {
-
-    DecodeUnit *decodeUnit = cpu->decodeUnit;
-
-    printf("instruction decode queue: %p, size: %i, numInsts: %i, items: ", decodeUnit->instDecodeQueue, decodeUnit->NI, *decodeUnit->numInstsInQueue);
-
-    for (int i = 0; i < *decodeUnit->numInstsInQueue; i++) {
-        printf("%p, ", decodeUnit->instDecodeQueue[i]);
-        //printInstruction(*decodeUnit->instDecodeQueue[i]);
     }
 
     printf("\n");
@@ -199,41 +201,76 @@ void cycleFunctionalUnits(CPU *cpu) {
     printf("\nperforming functional unit operations...\n");
     cycleIntFunctionalUnit(cpu->functionalUnits->intFU, cpu->statusTables);
     printIntFunctionalUnit(cpu->functionalUnits->intFU);
+
+    cycleFPFunctionalUnit(cpu->functionalUnits->fpAddFU, cpu->statusTables);
+    printFPFunctionalUnit(cpu->functionalUnits->fpAddFU);
+
+    cycleFPFunctionalUnit(cpu->functionalUnits->fpMulFU, cpu->statusTables);
+    printFPFunctionalUnit(cpu->functionalUnits->fpMulFU);
+
+    cycleFPFunctionalUnit(cpu->functionalUnits->fpDivFU, cpu->statusTables);
+    printFPFunctionalUnit(cpu->functionalUnits->fpDivFU);
+}
+
+// checks to see if the ROB status table is empty, indicating that the program has finished execution
+int executionIsComplete(CPU *cpu) {
+
+    // 2 cycles are required for the first instruction be issued and assigned a ROB entry
+    if (cpu->cycle <= 2) {
+        return 0;
+    // emergency cut off if cpu has reached one billion cycles
+    } else if (cpu->cycle >= 1000000000) {
+        return 1;
+    }
+    
+    // track the number of cycles that the ROB is consecutively empty
+    if (isROBEmpty(cpu->statusTables->robTable)) {
+        cpu->consecEmptyROBCycles++; 
+    } else {
+        cpu->consecEmptyROBCycles = 0;
+    }
+
+    // after an incorrect branch prediction flushes the ROB, it takes 2 cycles to fetch and issue the correct instruction
+    // if the ROB is still empty after this, then execution must be complete
+    return cpu->consecEmptyROBCycles > 2;
 }
 
 // start executing instructions on the CPU
 void executeCPU(CPU *cpu) {
 
-    int cycle = 0;
-
     // infinite loop to cycle the clock until execution finishes
-    for (int i = 1; i <= 5; i++) {
-        printf("\ncycle: %i\n", i);
+    // for (int i = 1; i <= 5; i++) {
+    while (!executionIsComplete(cpu)) {
 
-        cycleWritebackUnit(cpu->writebackUnit, cpu->statusTables, cpu->functionalUnits);
+        printf("\n----------------------------------------------------------------------------------------------------------------------------------------------------------------\n");
+        printf("\ncycle: %i\n", cpu->cycle);
+
+        cycleWritebackUnit(cpu->writebackUnit, cpu->decodeUnit, cpu->statusTables, cpu->functionalUnits, cpu->registerFile);
         printWritebackUnitCDBS(cpu->writebackUnit);
         printStatusTables(cpu);
 
         cycleFunctionalUnits(cpu);
 
-        cycleIssueUnit(cpu->issueUnit, cpu->statusTables, cpu->registerFile, cpu->stallStats);
-        printDecodeUnitOutputQueue(cpu);
+        //cycleIssueUnit(cpu->issueUnit, cpu->statusTables, cpu->registerFile, cpu->stallStats);
         printStatusTables(cpu);
 
-        cycleDecodeUnit(cpu->decodeUnit);
+        cycleDecodeUnit(cpu->decodeUnit, cpu->statusTables, cpu->registerFile, cpu->stallStats);
         printFreeList(cpu->decodeUnit);
         printMapTable(cpu->decodeUnit);
+        printDecodeQueue(cpu->decodeUnit);
         printInstructionFetchBuffer(cpu);
-        printDecodeUnitOutputQueue(cpu);
+        printStatusTables(cpu);
 
         cycleFetchUnit(cpu->fetchUnit, cpu->registerFile, cpu->instCache);
         printInstructionFetchBuffer(cpu);
         
         // break;
-        cycle++;
+        cpu->cycle++;
     }
 
-    printRegisterFileArchRegs(cpu->registerFile, cpu->decodeUnit);
-
+    printf("executed cycles: %i\n", cpu->cycle);
+    printRegisterFile(cpu->registerFile);
     printStallStats(cpu->stallStats);
+
+    teardownCPU(cpu);
 }

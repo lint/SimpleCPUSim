@@ -7,13 +7,13 @@
 #include "int_fu.h"
 
 // initialize a INT functional unit struct
-void initIntFunctionalUnit(IntFunctionalUnit *intFU) {
+void initIntFunctionalUnit(IntFunctionalUnit *intFU, int latency) {
 
-    intFU->latency = 1; // defined in the project description
+    intFU->latency = latency;
     intFU->lastSelectedResStation = -1;
     intFU->stages = malloc(intFU->latency * sizeof(IntFUResult *)); 
     intFU->stages[0] = NULL;
-    intFU->fuType = FUType_INT;
+    intFU->fuType = FU_TYPE_INT;
     intFU->isStalled = 0;
 }
 
@@ -31,7 +31,7 @@ IntFUResult *getCurrentIntFunctionalUnitResult(IntFunctionalUnit *intFU) {
 
 // helper method to print the contents of the int functional unit
 void printIntFunctionalUnit(IntFunctionalUnit *intFU) {
-    printf("int functional unit: latency: %i lastSelectedResStation: %i\n", intFU->latency, intFU->lastSelectedResStation);
+    printf("int functional unit: latency: %i lastSelectedResStation: %i isStalled: %i\n", intFU->latency, intFU->lastSelectedResStation, intFU->isStalled);
 
     for (int i = 0; i < intFU->latency; i++) {
         printf("\tstage: %i, ", i);
@@ -50,7 +50,8 @@ void cycleIntFunctionalUnit(IntFunctionalUnit *intFU, StatusTables *statusTables
     printf("\nperforming int functional unit operations...\n");
 
     if (intFU->isStalled) {
-        printf("int functional unit is stalled because its result was not placed on the CDB by the writeback unit\n");
+        printf("\tint functional unit is stalled because its result was not placed on the CDB by the writeback unit\n");
+        return;
     }
 
     ResStationStatusTable *resStationTable = statusTables->resStationTable;
@@ -65,12 +66,19 @@ void cycleIntFunctionalUnit(IntFunctionalUnit *intFU, StatusTables *statusTables
     for (int i = 0; i < numResStations; i++) {
 
         // get the reservation station entry's destination ROB and use it to get the assocaited ROB entry
-        ResStationStatusTableEntry *resStationEntry = resStationTable->intEntries[nextResStation];
+        ResStationStatusTableEntry *resStationEntry = resStationEntries[nextResStation];
         int destROB = resStationEntry->dest;
         ROBStatusTableEntry *robEntry = robTable->entries[destROB];
 
+        // do not allow instructions that just received a value from the CDB to execute in the same cycle
+        if (resStationEntry->busy && resStationEntry->justGotOperandFromCDB) {
+            resStationEntry->justGotOperandFromCDB = 0;
+            nextResStation = (nextResStation + 1) % numResStations;
+            continue;
+        }
+
         // if both operands of the reservation station and the instruction's state is "issued" then it can be brought into the functional unit
-        if ((resStationEntry->vjIsAvailable && resStationEntry->vkIsAvailable) && robEntry->state == STATE_ISSUED) {
+        if (resStationEntry->busy && (resStationEntry->vjIsAvailable && resStationEntry->vkIsAvailable) && robEntry->state == STATE_ISSUED) {
 
             printf("selecting reservation station: INT[%d] for execution\n", resStationEntry->resStationIndex);
             
@@ -86,11 +94,11 @@ void cycleIntFunctionalUnit(IntFunctionalUnit *intFU, StatusTables *statusTables
             nextResult->destROB = destROB;
 
             // perform the calculation for different possible operations
-            if (resStationEntry->op == FUOp_ADD) {
+            if (resStationEntry->op == FU_OP_ADD) {
                 nextResult->result = nextResult->source1 + nextResult->source2;
-            } else if (resStationEntry->op == FUOp_SUB) {
+            } else if (resStationEntry->op == FU_OP_SUB) {
                 nextResult->result = nextResult->source1 - nextResult->source2;
-            } else if (resStationEntry->op == FUOp_SLT) {
+            } else if (resStationEntry->op == FU_OP_SLT) {
                 nextResult->result = nextResult->source1 < nextResult->source2;
             } else {
                 printf("error: tried to start executing an instruction in the INT functional unit with an invalid operation\n");
@@ -108,17 +116,17 @@ void cycleIntFunctionalUnit(IntFunctionalUnit *intFU, StatusTables *statusTables
     }
 
     // move data through the stages of the functional unit by shifting elements of the stages array to the right
-    // this does not do anything in the current use case as the stages array is only one element, but i wanted to make it general
-    for (int i = 1; i < intFU->latency; i++) {
-        intFU->stages[i] = intFU->stages[i - 1];
-    }
+    // this does not do anything given the project design as the stages array is only one element, so it's commented out, but it's good to be general
+    // for (int i = intFU->latency - 1; i >= 1; i--) {
+    //     intFU->stages[i] = intFU->stages[i - 1];
+    // }
 
     // move the next result into the first stage element
     intFU->stages[0] = nextResult;
 
     // forward most recently completed result to reservation stations
-    // IntFUResult *newestResult = intFU->stages[intFU->latency-1];
-    // if (newestResult) {
-    //     forwardIntResultToResStationStatusTable(resStationTable, newestResult);
-    // }
+    IntFUResult *newestResult = getCurrentIntFunctionalUnitResult(intFU);
+    if (newestResult) {
+        sendIntUpdateToResStationStatusTable(resStationTable, newestResult->destROB, newestResult->result, 0);
+    }
 }

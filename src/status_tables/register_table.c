@@ -7,36 +7,74 @@
 
 // initialize the register status table
 void initRegisterStatusTable(RegisterStatusTable *regTable) {
-    
-    regTable->numEntries = PHYS_RN_SIZE;
-    regTable->entries = malloc(regTable->numEntries * sizeof(int));
-
-    for (int i = 0; i < regTable->numEntries; i++) {
-        regTable->entries[i] = -1;
-    }
+    regTable->headEntry = NULL;
 }
 
 // free any data elements of the register status table struct that are stored on the heap
 void teardownRegisterStatusTable(RegisterStatusTable *regTable) {
-    if (regTable->entries) {
-        free (regTable->entries);
+
+    RegisterStatusTableEntry *curr = regTable->headEntry;
+    RegisterStatusTableEntry *prev = NULL;
+    
+    while (curr) {
+        prev = curr;
+        curr = curr->next;
+        free(prev);
+    }       
+}
+
+// gets the entry in the register status table for a given register
+RegisterStatusTableEntry *registerStatusTableEntryForReg(RegisterStatusTable *regTable, ArchRegister *reg) {
+
+    RegisterStatusTableEntry *curr = regTable->headEntry;
+
+    if (!curr) {
+        return NULL;
+    }
+
+    // loop through all entries in the register status table
+    while (curr) { 
+
+        // check if the current register status table entry matches the given register details
+        if (archRegistersAreEqual(reg, curr->reg)) {
+            return curr;
+        }
+
+        curr = curr->next;
+    }
+
+    // matching entry not found, return null
+    return NULL;
+}
+
+// gets the ROB index for a given register
+int getRegisterStatusTableEntryROBIndex(RegisterStatusTable *regTable, ArchRegister *reg) {
+    RegisterStatusTableEntry *entry = registerStatusTableEntryForReg(regTable, reg);
+
+    if (entry) {
+        return entry->robIndex;
+    } else {
+        return -1;
     }
 }
 
 // sets the ROB index for a given register
-void setRegisterStatusTableEntryVal(RegisterStatusTable *regTable, enum PhysicalRegisterName reg, int robIndex) {
-    printf("set register status table entry: %i to ROB index: %i\n", reg, robIndex);
-    regTable->entries[reg] = robIndex;
-}
+void setRegisterStatusTableEntryROBIndex(RegisterStatusTable *regTable, ArchRegister *reg, int robIndex) {
+    printf("set register status table int entry: %s to ROB index: %i\n", reg->name, robIndex);
 
-// sets the ROB index to -1 for a given register
-void resetRegisterStatusTableEntryVal(RegisterStatusTable *regTable, enum PhysicalRegisterName reg) {
-    setRegisterStatusTableEntryVal(regTable, reg, -1);
-}
+    RegisterStatusTableEntry *entry = registerStatusTableEntryForReg(regTable, reg);
 
-// gets the ROB index for a given register
-int getRegisterStatusTableEntryVal(RegisterStatusTable *regTable, enum PhysicalRegisterName reg) {
-    return regTable->entries[reg];
+    // check if the entry exists, and create a new entry if not
+    if (entry) {
+        entry->robIndex = robIndex;
+    } else {
+        printf("\tcreating new register status table entry\n");
+        entry = malloc(sizeof(RegisterStatusTableEntry));
+        entry->next = regTable->headEntry;
+        entry->reg = reg;
+        entry->robIndex = robIndex;
+        regTable->headEntry = entry;
+    }
 }
 
 // prints the contents of the register status table
@@ -44,9 +82,14 @@ void printRegisterStatusTable(RegisterStatusTable *regTable) {
 
     printf("register status table:\n");
 
-    for (int i = 0; i < regTable->numEntries; i++) {
-        if (regTable->entries[i] != -1) {
-            printf("\treg: %s, robIndex: %i\n", physicalRegisterEnumToString(i), regTable->entries[i]);
+    RegisterStatusTableEntry *curr = regTable->headEntry;
+
+    if (curr) {
+        while (curr) {
+            printf("\t%s: %i\n", curr->reg->name, curr->robIndex);
+            curr = curr->next;
         }
+    } else {
+        printf("\tregister status table has no entries\n");
     }
 }

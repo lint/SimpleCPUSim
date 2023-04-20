@@ -126,14 +126,18 @@ void processInput(char *inputFn, CPU *cpu) {
 
             // initialize instruction
             Instruction inst;
-            inst.type = NONEI;
-            inst.destReg = NONER;
-            inst.source1Reg = NONER;
-            inst.source2Reg = NONER;
+            inst.type = INST_TYPE_NONE;
+            inst.destReg = NULL;
+            inst.source1Reg = NULL;
+            inst.source2Reg = NULL;
+            inst.destPhysReg = PHYS_REG_NONE;
+            inst.source1PhysReg = PHYS_REG_NONE;
+            inst.source2PhysReg = PHYS_REG_NONE;
             inst.imm = 0;
             inst.label[0] = '\0';
             inst.branchTargetLabel[0] = '\0';
             inst.branchTargetAddr = 0;
+            inst.regsWereRenamed = 0;
             enum InstructionType type;
 
             // get the first token of the line
@@ -157,7 +161,7 @@ void processInput(char *inputFn, CPU *cpu) {
             inst.type = stringToInstructionType(cur);
 
             // instruction type could not be matched
-            if (inst.type == NONEI) {
+            if (inst.type == INST_TYPE_NONE) {
                 
                 printf("error: invalid instruction type '%s'\n", cur);
                 readError = 1;
@@ -166,11 +170,11 @@ void processInput(char *inputFn, CPU *cpu) {
             // memory access instructions
             } else if (inst.type == FLD || inst.type == FSD) {
 
-                inst.destReg = stringToRegisterName(strtok(NULL, " \n\t,"));
+                inst.destReg = stringToArchRegister(strtok(NULL, " \n\t,"));
                 inst.imm = atoi(strtok(NULL, " \n\t,()"));
-                inst.source1Reg = stringToRegisterName(strtok(NULL, " \n\t,"));
+                inst.source1Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
 
-                if (inst.destReg == NONER || inst.source1Reg == NONER) {
+                if (!inst.destReg || !inst.source1Reg) {
                     printf("error: invalid register in instruction: '%s'\n", buf);
                     readError = 1;
                     break;
@@ -179,11 +183,11 @@ void processInput(char *inputFn, CPU *cpu) {
             // register-immediate instruction
             } else if (inst.type == ADDI) {
 
-                inst.destReg = stringToRegisterName(strtok(NULL, " \n\t,"));
-                inst.source1Reg = stringToRegisterName(strtok(NULL, " \n\t,"));
+                inst.destReg = stringToArchRegister(strtok(NULL, " \n\t,"));
+                inst.source1Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
                 inst.imm = atoi(strtok(NULL, " \n\t,"));
 
-                if (inst.destReg == NONER || inst.source1Reg == NONER) {
+                if (!inst.destReg || !inst.source1Reg) {
                     printf("error: invalid register in instruction: '%s'\n", buf);
                     readError = 1;
                     break;
@@ -191,12 +195,12 @@ void processInput(char *inputFn, CPU *cpu) {
 
             // register-register instructions
             } else if (inst.type == ADD || inst.type == SLT || inst.type == FADD || inst.type == FSUB || inst.type == FMUL || inst.type == FDIV) {
+                
+                inst.destReg = stringToArchRegister(strtok(NULL, " \n\t,"));
+                inst.source1Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
+                inst.source2Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
 
-                inst.destReg = stringToRegisterName(strtok(NULL, " \n\t,"));
-                inst.source1Reg = stringToRegisterName(strtok(NULL, " \n\t,"));
-                inst.source2Reg = stringToRegisterName(strtok(NULL, " \n\t,"));
-
-                if (inst.destReg == NONER || inst.source1Reg == NONER || inst.source2Reg == NONER) {
+                if (!inst.destReg || !inst.source1Reg || !inst.source2Reg) {
                     printf("error: invalid register in instruction: '%s'\n", buf);
                     readError = 1;
                     break;
@@ -205,20 +209,24 @@ void processInput(char *inputFn, CPU *cpu) {
             // branch instruction
             } else if (inst.type == BNE) {
 
-                inst.source1Reg = stringToRegisterName(strtok(NULL, " \n\t,"));
-                inst.source2Reg = stringToRegisterName(strtok(NULL, " \n\t,"));
+                inst.source1Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
+                inst.source2Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
                 char *targetLabel = strtok(NULL, " \n\t,");
                 memcpy(inst.branchTargetLabel, targetLabel, strlen(targetLabel));
                 inst.branchTargetLabel[strlen(targetLabel)] = '\0';
 
-                if (targetLabel == NULL || inst.source1Reg == NONER || inst.source2Reg == NONER) {
+                if (!targetLabel) {
+                    printf("error: invalid target label in instruction: '%s'\n", buf);
+                    readError = 1;
+                    break;
+                } else if (!inst.source1Reg || !inst.source2Reg) {
                     printf("error: invalid register in instruction: '%s'\n", buf);
                     readError = 1;
                     break;
                 }
 
             } else {
-                printf("error: this point should never be reached...\n");
+                printf("error: could not match this point should never be reached...\n");
                 readError = 1;
                 break;
             }
@@ -241,8 +249,6 @@ void processInput(char *inputFn, CPU *cpu) {
 }
 
 int main(int argc, char *argv[]) {
-
-    printf("size: %i\n", (int)sizeof(int));
 
     // check number of input files
     if (argc != 3) {

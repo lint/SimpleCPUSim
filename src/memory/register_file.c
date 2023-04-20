@@ -2,148 +2,146 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "register_file.h"
 #include "../types/types.h"
-#include "../stage_units/stage_units.h"
 
-// intializes a struct representing a register file
+#include "register_file.h"
+
+// initialize the register file struct
 void initRegisterFile(RegisterFile *registerFile) {
-    printf("initalizing register file...\n");
 
     registerFile->pc = 0;
-    registerFile->numEntries = PHYS_RN_SIZE;
-    registerFile->entries = malloc(registerFile->numEntries * sizeof(RegisterFileEntry *));
-    for (int i = 0; i < registerFile->numEntries; i++) {
+    registerFile->numPhysicalRegisters = PHYS_REG_SIZE;
+    registerFile->physicalRegisters = malloc(registerFile->numPhysicalRegisters * sizeof(RegisterFileEntry *));
+    for (int i = 0; i < registerFile->numPhysicalRegisters; i++) {
         RegisterFileEntry *entry = malloc(sizeof(RegisterFileEntry));
         entry->floatVal = 0;
         entry->intVal = 0;
-        entry->valType = INST_VAL_INT;
-        registerFile->entries[i] = entry;
+        entry->valueType = VALUE_TYPE_NONE;
+
+        registerFile->physicalRegisters[i] = entry;
+        
     }
 }
 
-// frees elements of the register file that are stored on the heap
+// free any register file elements that are stored on the heap
 void teardownRegisterFile(RegisterFile *registerFile) {
-    if (registerFile->entries) {
-        for (int i = 0; i < registerFile->numEntries; i++) {
-            free(registerFile->entries[i]);
-        }
-        free(registerFile->entries);
-    }
-}
-
-// returns the value of a given physical register
-int readRegisterFileInt(RegisterFile *registerFile, enum PhysicalRegisterName reg) {
     
-    // error if invalid register
-    if (reg < 0 || (reg >= PHYS_RN_SIZE && reg != PHYS_PC && reg != PHYS_ZERO)) {
-        printf("error: tried to read register: %i which is not in the register file\n", reg);
-        return 0;
+    if (registerFile->physicalRegisters) {
+        for (int i = 0; i < registerFile->numPhysicalRegisters; i++) {
+            free(registerFile->physicalRegisters[i]);
+        }
+        free(registerFile->physicalRegisters);
     }
-
-    // get either PC or ZERO special registers
-    if (reg == PHYS_PC) {
-        return registerFile->pc;
-    } else if (reg == PHYS_ZERO) {
-        return 0;
-    }
-
-    // read register file for physical registers
-    return registerFile->entries[reg]->intVal;
 }
 
-// returns the value of a given physical register 
+// read an integer value from the register file
+int readRegisterFileInt(RegisterFile *registerFile, enum PhysicalRegisterName reg) {
+
+    // check if reading the value of PC
+    if (reg == PHYS_REG_PC) {
+        return registerFile->pc;
+    // check if reading the value of $0
+    } else if (reg == PHYS_REG_ZERO) {
+        return 0;
+    // error if invalid register
+    } else if (reg < 0 || reg >= registerFile->numPhysicalRegisters) {
+        printf("error: tried to read integer register: %i which is not in the register file\n", reg);
+        exit(1);
+    }
+
+    // return the value of the register
+    RegisterFileEntry *entry = registerFile->physicalRegisters[reg];
+    entry->valueType = VALUE_TYPE_INT;
+
+    printf("read register: %s, int: %i\n", physicalRegisterNameToString(reg), entry->intVal);
+
+    return entry->intVal;
+}
+
+// read a float value from the register file
 float readRegisterFileFloat(RegisterFile *registerFile, enum PhysicalRegisterName reg) {
     
+    // return the value of $0 as a float
+    if (reg == PHYS_REG_ZERO) {
+        return 0;
     // error if invalid register
-    if (reg < 0 || (reg >= PHYS_RN_SIZE && reg != PHYS_PC && reg != PHYS_ZERO)) {
-        printf("error: tried to read register: %i which is not in the register file\n", reg);
-        return 0;
+    } else if (reg < 0 || reg >= registerFile->numPhysicalRegisters) {
+        printf("error: tried to read float register: %i which is not in the register file\n", reg);
+        exit(1);
     }
 
-    // get either PC or ZERO special registers
-    if (reg == PHYS_PC) {
-        return (float)registerFile->pc;
-    } else if (reg == PHYS_ZERO) {
-        return 0;
-    }
+    // return the value of the register
+    RegisterFileEntry *entry = registerFile->physicalRegisters[reg];
+    entry->valueType = VALUE_TYPE_FLOAT;
 
-    // read register file for physical registers
-    return registerFile->entries[reg]->floatVal;
+    printf("read register: %s, float: %f\n", physicalRegisterNameToString(reg), entry->floatVal);
+    
+    return entry->floatVal;
 }
 
-// writes a value to a given physical register
-void writeRegisterFileInt(RegisterFile *registerFile, enum PhysicalRegisterName reg, int value) {
+// writes an integer to the register file
+void writeRegisterFileInt(RegisterFile *registerFile, enum PhysicalRegisterName reg, int value){
     
-    // error if invalid register
-    if (reg < 0 || (reg >= PHYS_RN_SIZE && reg != PHYS_PC && reg != PHYS_ZERO)) {
-        printf("error: tried to write to register: %i which is not in the register file\n", reg);
-        return;
-    }
-
-    // get either PC or ZERO special registers
-    if (reg == PHYS_PC) {
+    // check if writing to PC
+    if (reg == PHYS_REG_PC) {
         registerFile->pc = value;
         return;
-    } else if (reg == PHYS_ZERO) {
-        printf("error: tried to write to $0 register\n");
-        return;
+    // check if attempting to write to the $0 register
+    } else if (reg == PHYS_REG_ZERO) {
+        printf("error: attempted to write to register $0 which cannot be done\n");
+        exit(1);
+    // error if invalid register
+    } else if (reg < 0 || reg >= registerFile->numPhysicalRegisters) {
+        printf("error: tried to write integer to register: %i which is not in the register file\n", reg);
+        exit(1);
     }
 
-    // write to the physical register
-    RegisterFileEntry *entry = registerFile->entries[reg];
+    // write the value to the register
+    RegisterFileEntry *entry = registerFile->physicalRegisters[reg];
     entry->intVal = value;
-    entry->floatVal = (float)value;
-    entry->valType = INST_VAL_INT;
-}
+    entry->valueType = VALUE_TYPE_INT;
+} 
 
-// writes a value to a given physical register
+// write a float to the register file
 void writeRegisterFileFloat(RegisterFile *registerFile, enum PhysicalRegisterName reg, float value) {
     
+    // check if writing to PC
+    if (reg == PHYS_REG_PC) {
+        printf("error: attempted to write a float to register PC which cannot be done\n");
+        exit(1);
+    // check if attempting to write to the $0 register
+    } else if (reg == PHYS_REG_ZERO) {
+        printf("error: attempted to write to register $0 which cannot be done\n");
+        exit(1);
     // error if invalid register
-    if (reg < 0 || (reg >= PHYS_RN_SIZE && reg != PHYS_PC && reg != PHYS_ZERO)) {
-        printf("error: tried to write to register: %i which is not in the register file\n", reg);
-        return;
+    } else if (reg < 0 || reg >= registerFile->numPhysicalRegisters) {
+        printf("error: tried to write float register: %i which is not in the register file\n", reg);
+        exit(1);
     }
 
-    // get either PC or ZERO special registers
-    if (reg == PHYS_PC) {
-        printf("error: tried to write a float value to the PC register\n");
-        return;
-    } else if (reg == PHYS_ZERO) {
-        printf("error: tried to write to $0 register\n");
-        return;
-    }
-
-    // write to the physical register
-    RegisterFileEntry *entry = registerFile->entries[reg];
-    entry->intVal = (int)value;
+    // write the value to the register
+    RegisterFileEntry *entry = registerFile->physicalRegisters[reg];
     entry->floatVal = value;
-    entry->valType = INST_VAL_FLOAT;
-}
+    entry->valueType = VALUE_TYPE_FLOAT;
+} 
 
-// prints the current contents of the register file
+// print the contents of the register file
 void printRegisterFile(RegisterFile *registerFile) {
 
-    printf("register file (values casted to int): \n");
-    printf("\t$0: %i\n", readRegisterFileInt(registerFile, PHYS_ZERO));
-    printf("\tPC: %i\n", readRegisterFileInt(registerFile, PHYS_PC));
+    printf("register file:\n");
 
-    for (int i = 0; i < PHYS_RN_SIZE; i++) {
-        printf("\t%s: %i\n", physicalRegisterEnumToString(i), readRegisterFileInt(registerFile, i));
-    }
-}
+    printf("\tPC: %i\n", readRegisterFileInt(registerFile, PHYS_REG_PC));
 
-// prints the current contents of the register file showing architecture registers
-void printRegisterFileArchRegs(RegisterFile *registerFile, DecodeUnit *decodeUnit) {
-    
-    printf("register file (values casted to int): \n");
-    printf("\t$0: %i\n", readRegisterFileInt(registerFile, PHYS_ZERO));
-    printf("\tPC: %i\n", readRegisterFileInt(registerFile, PHYS_PC));
+    // loop over every physical register 
+    for (int i = 0; i < registerFile->numPhysicalRegisters; i++) {
+        RegisterFileEntry *entry = registerFile->physicalRegisters[i];
 
-    for (int i = 0; i < RN_SIZE; i++) {
-        enum PhysicalRegisterName mappedPhysReg = readMapTable(decodeUnit, i);
-        int val = mappedPhysReg == NONEPR ? 0 : readRegisterFileInt(registerFile, mappedPhysReg);
-        printf("\t%s: %i\n", registerEnumToString(i), val);
+        if (entry->valueType == VALUE_TYPE_INT) {
+            printf("\t%s: %i\n", physicalRegisterNameToString(i), entry->intVal);
+        } else if (entry->valueType == VALUE_TYPE_FLOAT) {
+            printf("\t%s: %f\n", physicalRegisterNameToString(i), entry->floatVal);
+        } else {
+            printf("\t%s: 0 (never used)\n", physicalRegisterNameToString(i));
+        }
     }
 }

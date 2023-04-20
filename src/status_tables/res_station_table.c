@@ -12,16 +12,17 @@
 ResStationStatusTableEntry *newResStationStatusTableEntry() {
     ResStationStatusTableEntry *entry = malloc(sizeof(ResStationStatusTableEntry));
 
-    entry->fuType = FUType_NONE;
+    entry->fuType = FU_TYPE_NONE;
     entry->resStationIndex = -1;
     entry->busy = 0;
-    entry->op = FUOp_NONE;
+    entry->op = FU_OP_NONE;
     entry->vjInt = 0;
     entry->vjFloat = 0;
     entry->vjIsAvailable = 0;
     entry->vkInt = 0;
     entry->vkFloat = 0;
     entry->vkIsAvailable = 0;
+    entry->justGotOperandFromCDB = 0;
     entry->qj = -1;
     entry->qk = -1;
     entry->dest = -1;
@@ -38,7 +39,7 @@ void initResStationStatusTable(ResStationStatusTable *resStationTable) {
     resStationTable->numLoadStations = 2;
     resStationTable->numStoreStations = 2;
     resStationTable->numFPAddStations = 3;
-    resStationTable->numFPMultStations = 3;
+    resStationTable->numFPMulStations = 3;
     resStationTable->numFPDivStations = 2;
     resStationTable->numBUStations = 2;
 
@@ -47,7 +48,7 @@ void initResStationStatusTable(ResStationStatusTable *resStationTable) {
     resStationTable->loadEntries = malloc(resStationTable->numLoadStations * sizeof(ResStationStatusTableEntry *));
     resStationTable->storeEntries = malloc(resStationTable->numStoreStations * sizeof(ResStationStatusTableEntry *));
     resStationTable->fpAddEntries = malloc(resStationTable->numFPAddStations * sizeof(ResStationStatusTableEntry *));
-    resStationTable->fpMultEntries = malloc(resStationTable->numFPMultStations * sizeof(ResStationStatusTableEntry *));
+    resStationTable->fpMulEntries = malloc(resStationTable->numFPMulStations * sizeof(ResStationStatusTableEntry *));
     resStationTable->fpDivEntries = malloc(resStationTable->numFPDivStations * sizeof(ResStationStatusTableEntry *));
     resStationTable->buEntries = malloc(resStationTable->numBUStations * sizeof(ResStationStatusTableEntry *));
 
@@ -55,7 +56,7 @@ void initResStationStatusTable(ResStationStatusTable *resStationTable) {
     for (int i = 0; i < resStationTable->numIntStations; i++) {
         ResStationStatusTableEntry *entry = newResStationStatusTableEntry();
         
-        entry->fuType = FUType_INT;
+        entry->fuType = FU_TYPE_INT;
         entry->resStationIndex = i;
 
         resStationTable->intEntries[i] = entry;
@@ -65,7 +66,7 @@ void initResStationStatusTable(ResStationStatusTable *resStationTable) {
     for (int i = 0; i < resStationTable->numLoadStations; i++) {
         ResStationStatusTableEntry *entry = newResStationStatusTableEntry();
         
-        entry->fuType = FUType_LOAD;
+        entry->fuType = FU_TYPE_LOAD;
         entry->resStationIndex = i;
 
         resStationTable->loadEntries[i] = entry;
@@ -75,37 +76,37 @@ void initResStationStatusTable(ResStationStatusTable *resStationTable) {
     for (int i = 0; i < resStationTable->numStoreStations; i++) {
         ResStationStatusTableEntry *entry = newResStationStatusTableEntry();
         
-        entry->fuType = FUType_STORE;
+        entry->fuType = FU_TYPE_STORE;
         entry->resStationIndex = i;
 
         resStationTable->storeEntries[i] = entry;
     }
 
-    // initialize FPadd functional unit reservation station entries
+    // initialize FPAdd functional unit reservation station entries
     for (int i = 0; i < resStationTable->numFPAddStations; i++) {
         ResStationStatusTableEntry *entry = newResStationStatusTableEntry();
         
-        entry->fuType = FUType_FPAdd;
+        entry->fuType = FU_TYPE_FPADD;
         entry->resStationIndex = i;
 
         resStationTable->fpAddEntries[i] = entry;
     }
 
-    // initialize FPMult functional unit reservation station entries
-    for (int i = 0; i < resStationTable->numFPMultStations; i++) {
+    // initialize FPMul functional unit reservation station entries
+    for (int i = 0; i < resStationTable->numFPMulStations; i++) {
         ResStationStatusTableEntry *entry = newResStationStatusTableEntry();
         
-        entry->fuType = FUType_FPMult;
+        entry->fuType = FU_TYPE_FPMUL;
         entry->resStationIndex = i;
 
-        resStationTable->fpMultEntries[i] = entry;
+        resStationTable->fpMulEntries[i] = entry;
     }
 
-    // initialize FPdiv functional unit reservation station entries
+    // initialize FPDiv functional unit reservation station entries
     for (int i = 0; i < resStationTable->numFPDivStations; i++) {
         ResStationStatusTableEntry *entry = newResStationStatusTableEntry();
         
-        entry->fuType = FUType_FPDiv;
+        entry->fuType = FU_TYPE_FPDIV;
         entry->resStationIndex = i;
 
         resStationTable->fpDivEntries[i] = entry;
@@ -115,7 +116,7 @@ void initResStationStatusTable(ResStationStatusTable *resStationTable) {
     for (int i = 0; i < resStationTable->numBUStations; i++) {
         ResStationStatusTableEntry *entry = newResStationStatusTableEntry();
         
-        entry->fuType = FUType_BU;
+        entry->fuType = FU_TYPE_BU;
         entry->resStationIndex = i;
 
         resStationTable->buEntries[i] = entry;
@@ -152,11 +153,11 @@ void teardownResStationStatusTable(ResStationStatusTable *resStationTable) {
         free(resStationTable->fpAddEntries);
     }
 
-    if (resStationTable->fpMultEntries) {
-        for (int i = 0; i < resStationTable->numFPMultStations; i++) {
-            free(resStationTable->fpMultEntries[i]);
+    if (resStationTable->fpMulEntries) {
+        for (int i = 0; i < resStationTable->numFPMulStations; i++) {
+            free(resStationTable->fpMulEntries[i]);
         }
-        free(resStationTable->fpMultEntries);
+        free(resStationTable->fpMulEntries);
     }
 
     if (resStationTable->fpDivEntries) {
@@ -176,19 +177,19 @@ void teardownResStationStatusTable(ResStationStatusTable *resStationTable) {
 
 // returns the number of reservation stations for a given functional unit
 int numResStationsForFunctionalUnit(ResStationStatusTable *resStationTable, int fuType) {
-    if (fuType == FUType_INT) {
+    if (fuType == FU_TYPE_INT) {
         return resStationTable->numIntStations;
-    } else if (fuType == FUType_LOAD) {
+    } else if (fuType == FU_TYPE_LOAD) {
         return resStationTable->numLoadStations;
-    } else if (fuType == FUType_LOAD) {
+    } else if (fuType == FU_TYPE_LOAD) {
         return resStationTable->numStoreStations;
-    } else if (fuType == FUType_FPAdd) {
+    } else if (fuType == FU_TYPE_FPADD) {
         return resStationTable->numFPAddStations;
-    } else if (fuType == FUType_FPMult) {
-        return resStationTable->numFPMultStations;
-    } else if (fuType == FUType_FPDiv) {
+    } else if (fuType == FU_TYPE_FPMUL) {
+        return resStationTable->numFPMulStations;
+    } else if (fuType == FU_TYPE_FPDIV) {
         return resStationTable->numFPDivStations;
-    } else if (fuType == FUType_BU) {
+    } else if (fuType == FU_TYPE_BU) {
         return resStationTable->numBUStations;
     } else {
         printf("error: invalid FunctionalUnitType used while getting number of reservation stations...\n");
@@ -198,19 +199,19 @@ int numResStationsForFunctionalUnit(ResStationStatusTable *resStationTable, int 
 
 // returns the reservation station entry list for a given functional unit
 ResStationStatusTableEntry **resStationEntriesForFunctionalUnit(ResStationStatusTable *resStationTable, int fuType) {
-    if (fuType == FUType_INT) {
+    if (fuType == FU_TYPE_INT) {
         return resStationTable->intEntries;
-    } else if (fuType == FUType_LOAD) {
+    } else if (fuType == FU_TYPE_LOAD) {
         return resStationTable->loadEntries;
-    } else if (fuType == FUType_LOAD) {
+    } else if (fuType == FU_TYPE_LOAD) {
         return resStationTable->storeEntries;
-    } else if (fuType == FUType_FPAdd) {
+    } else if (fuType == FU_TYPE_FPADD) {
         return resStationTable->fpAddEntries;
-    } else if (fuType == FUType_FPMult) {
-        return resStationTable->fpMultEntries;
-    } else if (fuType == FUType_FPDiv) {
+    } else if (fuType == FU_TYPE_FPMUL) {
+        return resStationTable->fpMulEntries;
+    } else if (fuType == FU_TYPE_FPDIV) {
         return resStationTable->fpDivEntries;
-    } else if (fuType == FUType_BU) {
+    } else if (fuType == FU_TYPE_BU) {
         return resStationTable->buEntries;
     } else {
         printf("error: invalid FunctionalUnitType used while get reservation station entries array...\n");
@@ -249,7 +250,7 @@ ResStationStatusTableEntry **resStationEntriesForInstruction(ResStationStatusTab
     } else if (instType == FADD || instType == FSUB) {
         return resStationTable->fpAddEntries;
     } else if (instType == FMUL) {
-        return resStationTable->fpMultEntries;
+        return resStationTable->fpMulEntries;
     } else if (instType == FDIV) {
         return resStationTable->fpDivEntries;
     } else if (instType == BNE) {
@@ -288,19 +289,19 @@ int indexForFreeResStationForInstruction(ResStationStatusTable *resStationTable,
 
     // search for a reservation station needed by the given instruction
     if (instType == ADD || instType == ADDI || instType == SLT) {
-        return indexForFreeResStation(resStationTable, FUType_INT);
+        return indexForFreeResStation(resStationTable, FU_TYPE_INT);
     } else if (instType == FLD) {
-        return indexForFreeResStation(resStationTable, FUType_LOAD);
+        return indexForFreeResStation(resStationTable, FU_TYPE_LOAD);
     } else if (instType == FSD) {
-        return indexForFreeResStation(resStationTable, FUType_STORE);
+        return indexForFreeResStation(resStationTable, FU_TYPE_STORE);
     } else if (instType == FADD || instType == FSUB) {
-        return indexForFreeResStation(resStationTable, FUType_FPAdd);
+        return indexForFreeResStation(resStationTable, FU_TYPE_FPADD);
     } else if (instType == FMUL) {
-        return indexForFreeResStation(resStationTable, FUType_FPMult);
+        return indexForFreeResStation(resStationTable, FU_TYPE_FPMUL);
     } else if (instType == FDIV) {
-        return indexForFreeResStation(resStationTable, FUType_FPDiv);
+        return indexForFreeResStation(resStationTable, FU_TYPE_FPDIV);
     } else if (instType == BNE) {
-        return indexForFreeResStation(resStationTable, FUType_BU);
+        return indexForFreeResStation(resStationTable, FU_TYPE_BU);
     } else {
         printf("got invalid instruction type while trying to get the index of a free reservation station, this should never happen...");
         exit(1);
@@ -334,26 +335,27 @@ int numBusyResStationsForFunctionalUnit(ResStationStatusTable *resStationTable, 
 }
 
 // helper method to set the availability of a given operand in a reservation station status table entry
-void setResStationEntryOperandAvailability(ResStationStatusTableEntry *entry, RegisterStatusTable *regTable, RegisterFile *regFile, int sourceNum, int physReg, int resultType) {
+void setResStationEntryOperandAvailability(ResStationStatusTableEntry *entry, RegisterStatusTable *regTable, RegisterFile *regFile, 
+    int sourceNum, ArchRegister *reg, enum PhysicalRegisterName renamedReg, int resultType) {
 
-    // get the current ROB that will write to the source physical register
-    int robIndex = getRegisterStatusTableEntryVal(regTable, physReg);
+    // get the current ROB that will write to the source architecture register
+    int robIndex = getRegisterStatusTableEntryROBIndex(regTable, reg);
 
     // source is not associated with a ROB entry, read from register file
     if (robIndex == -1) {
         if (sourceNum == 1) {
-            if (resultType == INST_VAL_INT) {
-                entry->vjInt = readRegisterFileInt(regFile, physReg);
+            if (resultType == VALUE_TYPE_INT) {
+                entry->vjInt = readRegisterFileInt(regFile, renamedReg);
             } else {
-                entry->vjFloat = readRegisterFileFloat(regFile, physReg);
+                entry->vjFloat = readRegisterFileFloat(regFile, renamedReg);
             }
             
             entry->vjIsAvailable = 1;
         } else {
-            if (resultType == INST_VAL_INT) {
-                entry->vkInt = readRegisterFileInt(regFile, physReg);
+            if (resultType == VALUE_TYPE_INT) {
+                entry->vkInt = readRegisterFileInt(regFile, renamedReg);
             } else {
-                entry->vkFloat = readRegisterFileFloat(regFile, physReg);
+                entry->vkFloat = readRegisterFileFloat(regFile, renamedReg);
             }
             entry->vkIsAvailable = 1;
         }
@@ -367,6 +369,8 @@ void setResStationEntryOperandAvailability(ResStationStatusTableEntry *entry, Re
             entry->vkIsAvailable = 0;
             entry->qk = robIndex;
         }
+
+        // TODO: is there actually anything i need to change here or am i good?
     }
 }
 
@@ -386,10 +390,10 @@ void addInstToResStation(ResStationStatusTable *resStationTable, RegisterStatusT
         // add ADDI instructions to the reservation station
         if (instType == ADDI) {    
 
-            entry->op = FUOp_ADD;
+            entry->op = FU_OP_ADD;
 
             // read first operand from register file or set source ROB 
-            setResStationEntryOperandAvailability(entry, regTable, regFile, 1, inst->source1PhysReg, INST_VAL_INT);
+            setResStationEntryOperandAvailability(entry, regTable, regFile, 1, inst->source1Reg, inst->source1PhysReg, VALUE_TYPE_INT);
 
             // manually do the second operand since its value is available within the instruction itself
             entry->vkInt = inst->imm;
@@ -398,11 +402,11 @@ void addInstToResStation(ResStationStatusTable *resStationTable, RegisterStatusT
         // add ADD or SLT instructions to the reservation station
         } else {
             
-            entry->op = instType == ADD ? FUOp_ADD : FUOp_SLT;
+            entry->op = instType == ADD ? FU_OP_ADD : FU_OP_SLT;
 
             // read operands from register file or set source ROB 
-            setResStationEntryOperandAvailability(entry, regTable, regFile, 1, inst->source1PhysReg, INST_VAL_INT);
-            setResStationEntryOperandAvailability(entry, regTable, regFile, 2, inst->source2PhysReg, INST_VAL_INT);
+            setResStationEntryOperandAvailability(entry, regTable, regFile, 1, inst->source1Reg, inst->source1PhysReg, VALUE_TYPE_INT);
+            setResStationEntryOperandAvailability(entry, regTable, regFile, 2, inst->source2Reg, inst->source2PhysReg, VALUE_TYPE_INT);
         }
 
     // add instructions that need the FPAdd functional unit to the reservation station
@@ -410,12 +414,12 @@ void addInstToResStation(ResStationStatusTable *resStationTable, RegisterStatusT
 
         // set the entry's add or sub operation for FADD and FSUB instructions
         if (instType == FADD || instType == FSUB) {
-            entry->op = instType == FADD ? FUOp_ADD : FUOp_SUB;
+            entry->op = instType == FADD ? FU_OP_ADD : FU_OP_SUB;
         }
 
         // read operands from register file or set source ROB 
-        setResStationEntryOperandAvailability(entry, regTable, regFile, 1, inst->source1PhysReg, INST_VAL_FLOAT);
-        setResStationEntryOperandAvailability(entry, regTable, regFile, 2, inst->source2PhysReg, INST_VAL_FLOAT);
+        setResStationEntryOperandAvailability(entry, regTable, regFile, 1, inst->source1Reg, inst->source1PhysReg, VALUE_TYPE_FLOAT);
+        setResStationEntryOperandAvailability(entry, regTable, regFile, 2, inst->source2Reg, inst->source2PhysReg, VALUE_TYPE_FLOAT);
     
     // add instructions that need the load functional unit to the reservation station
     } else if (instType == FLD) {
@@ -426,89 +430,91 @@ void addInstToResStation(ResStationStatusTable *resStationTable, RegisterStatusT
     // add instructions that need the BU functional unit to the reservation station
     } else if (instType == BNE) {
 
-    }    
+    }
+
+    // TODO
 
     printf("added instruction: %p to reservation station: %i\n", inst, resStationIndex);
 }
 
-// helper method to process int forwarding for any list of reservation station status table entries
-void processIntForwardingForResStationEntries(ResStationStatusTableEntry **entries, int numEntries, IntFUResult *intResult) {
+// helper method to process int updates for any list of reservation station status table entries
+void processIntUpdateForResStationEntries(ResStationStatusTableEntry **entries, int numEntries, int destROB, int result, int fromCDB) {
 
     for (int i = 0; i < numEntries; i++) {
         ResStationStatusTableEntry *entry = entries[i];
 
-        // only update the entry's operands if they are currently avaialble and the result ROB matches the source ROB
-        if (!entry->vjIsAvailable && entry->qj == intResult->destROB) {
-            printf("reservation station index: %i received forwarded int: %i for vj\n", entry->resStationIndex, intResult->result);
+        // only update the entry's operands if they are currently available and the result ROB matches the source ROB
+        if (entry->busy && !entry->vjIsAvailable && entry->qj == destROB) {
+            printf("reservation station index: %i received int value: %i for vj\n", entry->resStationIndex, result);
 
             entry->vjIsAvailable = 1;
-            entry->vjInt = intResult->result;
+            entry->vjInt = result;
             entry->qj = -1;
+            entry->justGotOperandFromCDB = fromCDB;
         }
 
-        if (!entry->vkIsAvailable && entry->qk == intResult->destROB) {
-            printf("reservation station index: %i received forwarded int: %i for vk\n", entry->resStationIndex, intResult->result);
+        if (entry->busy && !entry->vkIsAvailable && entry->qk == destROB) {
+            printf("reservation station index: %i received int value: %i for vk\n", entry->resStationIndex, result);
 
             entry->vkIsAvailable = 1;
-            entry->vkInt = intResult->result;
+            entry->vkInt = result;
             entry->qk = -1;
+            entry->justGotOperandFromCDB = fromCDB;
         }
     }
 }
 
-// helper method to process float forwarding for any list of reservation station status table entries
-void processFloatForwardingForResStationEntries(ResStationStatusTableEntry **entries, int numEntries, FloatFUResult *floatResult) {
+// helper method to process float updates for any list of reservation station status table entries
+void processFloatUpdateForResStationEntries(ResStationStatusTableEntry **entries, int numEntries, int destROB, float result, int fromCDB) {
 
     for (int i = 0; i < numEntries; i++) {
         ResStationStatusTableEntry *entry = entries[i];
 
-        // only update the entry's operands if they are currently avaialble and the result ROB matches the source ROB
-        if (!entry->vjIsAvailable && entry->qj == floatResult->destROB) {
-            printf("reservation station index: %i received forwarded float: %f for vj\n", entry->resStationIndex, floatResult->result);
+        // only update the entry's operands if they are currently available and the result ROB matches the source ROB
+        if (entry->busy && !entry->vjIsAvailable && entry->qj == destROB) {
+            printf("reservation station index: %i received float value: %f for vj\n", entry->resStationIndex, result);
 
             entry->vjIsAvailable = 1;
-            entry->vjFloat = floatResult->result;
+            entry->vjFloat = result;
             entry->qj = -1;
+            entry->justGotOperandFromCDB = fromCDB;
         }
 
-        if (!entry->vkIsAvailable && entry->qk == floatResult->destROB) {
-            printf("reservation station index: %i received forwarded float: %f for vk\n", entry->resStationIndex, floatResult->result);
+        if (entry->busy && !entry->vkIsAvailable && entry->qk == destROB) {
+            printf("reservation station index: %i received forwarded float: %f for vk\n", entry->resStationIndex, result);
 
             entry->vkIsAvailable = 1;
-            entry->vkFloat = floatResult->result;
+            entry->vkFloat = result;
             entry->qk = -1;
+            entry->justGotOperandFromCDB = fromCDB;
         }
     }
 }
 
-// updates the operands of reservation stations via a functional unit forwarding the int result
-void forwardIntResultToResStationStatusTable(ResStationStatusTable *resStationTable, IntFUResult *intResult) {
+// updates the operands of reservation stations waiting for an integer value
+void sendIntUpdateToResStationStatusTable(ResStationStatusTable *resStationTable, int destROB, int result, int fromCDB) {
 
-    int robIndex = intResult->destROB;
-    int resultVal = intResult->result;
-    printf("forwarding int result: %i robIndex: %i to reservation stations\n", resultVal, robIndex);
+    printf("sending int result: %i robIndex: %i to reservation stations\n", result, destROB);
 
     // forward int result to reservation stations that can use int registers
-    processIntForwardingForResStationEntries(resStationTable->intEntries, resStationTable->numIntStations, intResult);
-    processIntForwardingForResStationEntries(resStationTable->loadEntries, resStationTable->numLoadStations, intResult);
-    processIntForwardingForResStationEntries(resStationTable->storeEntries, resStationTable->numStoreStations, intResult);
-    processIntForwardingForResStationEntries(resStationTable->buEntries, resStationTable->numBUStations, intResult);
+    processIntUpdateForResStationEntries(resStationTable->intEntries, resStationTable->numIntStations, destROB, result, fromCDB);
+    processIntUpdateForResStationEntries(resStationTable->loadEntries, resStationTable->numLoadStations, destROB, result, fromCDB);
+    processIntUpdateForResStationEntries(resStationTable->storeEntries, resStationTable->numStoreStations, destROB, result, fromCDB);
+    processIntUpdateForResStationEntries(resStationTable->buEntries, resStationTable->numBUStations, destROB, result, fromCDB);
 }
 
-// updates the operands of reservation stations via a functional unit forwarding the float result
-void forwardFloatResultToResStationStatusTable(ResStationStatusTable *resStationTable, FloatFUResult *floatResult) {
+// updates the operands of reservation stations waiting for a float value
+void sendFloatUpdateToResStationStatusTable(ResStationStatusTable *resStationTable, int destROB, float result, int fromCDB) {
 
-    int robIndex = floatResult->destROB;
-    float resultVal = floatResult->result;
-    printf("forwarding float result: %f robIndex: %i to reservation stations\n", resultVal, robIndex);
+    printf("sending float result: %f robIndex: %i to reservation stations\n", result, destROB);
 
     // forward int result to reservation stations that can use int registers
-    processFloatForwardingForResStationEntries(resStationTable->loadEntries, resStationTable->numLoadStations, floatResult);
-    processFloatForwardingForResStationEntries(resStationTable->storeEntries, resStationTable->numStoreStations, floatResult);
-    processFloatForwardingForResStationEntries(resStationTable->buEntries, resStationTable->numBUStations, floatResult);
-    processFloatForwardingForResStationEntries(resStationTable->fpAddEntries, resStationTable->numFPAddStations, floatResult);
-    processFloatForwardingForResStationEntries(resStationTable->fpMultEntries, resStationTable->numFPMultStations, floatResult);
-    processFloatForwardingForResStationEntries(resStationTable->fpDivEntries, resStationTable->numFPDivStations, floatResult);
+    processFloatUpdateForResStationEntries(resStationTable->loadEntries, resStationTable->numLoadStations, destROB, result, fromCDB);
+    processFloatUpdateForResStationEntries(resStationTable->storeEntries, resStationTable->numStoreStations, destROB, result, fromCDB);
+    processFloatUpdateForResStationEntries(resStationTable->buEntries, resStationTable->numBUStations, destROB, result, fromCDB);
+    processFloatUpdateForResStationEntries(resStationTable->fpAddEntries, resStationTable->numFPAddStations, destROB, result, fromCDB);
+    processFloatUpdateForResStationEntries(resStationTable->fpMulEntries, resStationTable->numFPMulStations, destROB, result, fromCDB);
+    processFloatUpdateForResStationEntries(resStationTable->fpDivEntries, resStationTable->numFPDivStations, destROB, result, fromCDB);
 }
 
 // prints the contents of the reservation station status table
@@ -520,7 +526,7 @@ void printResStationStatusTable(ResStationStatusTable *resStationTable) {
     for (int i = 0; i < resStationTable->numIntStations; i++) {
         ResStationStatusTableEntry *entry = resStationTable->intEntries[i];
         
-        printf("\tindex: %i, busy: %i, op: %s, vjInt: %i, vkInt: %i, vjIsAvail: %i, vkIsAvail: %i, qj: %i, qk: %i, dest: %i\n", 
+        printf("\tindex: %i, busy: %i, op: %s, vjInt: %i, vkInt: %i, vjIsAvail: %i, vkIsAvail: %i, qj: %i, qk: %i, destROB: %i\n", 
             entry->resStationIndex, entry->busy, fuOpToString(entry->op), entry->vjInt, entry->vkInt,
             entry->vjIsAvailable, entry->vkIsAvailable, entry->qj, entry->qk, entry->dest);
     }

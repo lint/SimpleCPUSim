@@ -1,19 +1,16 @@
 
-// forward declarations
-enum PhysicalRegisterName; // TODO: remove this?
-typedef struct DecodeUnit DecodeUnit;
-
+// struct which contains both a float and int value to store speculative results
 typedef struct RegisterFileEntry {
     int intVal;
     float floatVal;
-    int valType; // enum InstructionResultValueType
+    int valueType; // enum ValueType in types.h // TODO: do i even need this?
 } RegisterFileEntry;
 
-// struct representing a register file
+// struct representing the register file
 typedef struct RegisterFile {
 
-    RegisterFileEntry **entries;
-    int numEntries;
+    RegisterFileEntry **physicalRegisters;
+    int numPhysicalRegisters;
     int pc;
 
 } RegisterFile;
@@ -21,9 +18,8 @@ typedef struct RegisterFile {
 // register file methods
 void initRegisterFile(RegisterFile *registerFile);
 void teardownRegisterFile(RegisterFile *registerFile);
-int readRegisterFileInt(RegisterFile *registerFile, enum PhysicalRegisterName reg);
-float readRegisterFileFloat(RegisterFile *registerFile, enum PhysicalRegisterName reg);
-void writeRegisterFileInt(RegisterFile *registerFile, enum PhysicalRegisterName reg, int value);
-void writeRegisterFileFloat(RegisterFile *registerFile, enum PhysicalRegisterName reg, float value);
 void printRegisterFile(RegisterFile *registerFile);
-void printRegisterFileArchRegs(RegisterFile *registerFile, DecodeUnit *decodeUnit);
+int readRegisterFileInt(RegisterFile *registerFile, int reg); // reg = enum IntRegisterName
+float readRegisterFileFloat(RegisterFile *registerFile, int reg); // reg = enum FloatRegisterName
+void writeRegisterFileInt(RegisterFile *registerFile, int reg, int value); // reg = enum IntRegisterName
+void writeRegisterFileFloat(RegisterFile *registerFile, int reg, float value); // reg = enum FloatRegisterName

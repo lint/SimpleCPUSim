@@ -26,6 +26,9 @@ typedef struct StallStats {
 // struct representing the CPU
 typedef struct CPU {
 
+    int cycle;
+    int consecEmptyROBCycles;
+
     Params *params;
     StallStats *stallStats;
 
@@ -35,7 +38,7 @@ typedef struct CPU {
 
     FetchUnit *fetchUnit;
     DecodeUnit *decodeUnit;
-    IssueUnit *issueUnit;
+    // IssueUnit *issueUnit;
     WritebackUnit *writebackUnit;
 
     FunctionalUnits *functionalUnits;
@@ -45,4 +48,11 @@ typedef struct CPU {
 
 void initCPU(CPU *cpu, Params *params);
 void teardownCPU(CPU *cpu);
+
+void cycleFunctionalUnits(CPU *cpu);
+void printStallStats(StallStats *stallStats);
+void printStatusTables(CPU *cpu);
+void printInstructionFetchBuffer(CPU *cpu);
+int executionIsComplete(CPU *cpu);
+
 void executeCPU(CPU *cpu);

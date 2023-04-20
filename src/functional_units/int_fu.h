@@ -1,7 +1,7 @@
 
 // forward declarations
-typedef struct IntFUResult IntFUResult;
 typedef struct StatusTables StatusTables;
+typedef struct IntFUResult IntFUResult;
 
 typedef struct IntFunctionalUnit {
 
@@ -14,7 +14,7 @@ typedef struct IntFunctionalUnit {
 } IntFunctionalUnit;
 
 // int functional unit methods
-void initIntFunctionalUnit(IntFunctionalUnit *intFU);
+void initIntFunctionalUnit(IntFunctionalUnit *intFU, int latency);
 void teardownIntFunctionalUnit(IntFunctionalUnit *intFU);
 IntFUResult *getCurrentIntFunctionalUnitResult(IntFunctionalUnit *intFU);
 void printIntFunctionalUnit(IntFunctionalUnit *intFU);

@@ -18,6 +18,7 @@ typedef struct ResStationStatusTableEntry {
     float vkFloat;
     int vjIsAvailable;
     int vkIsAvailable;
+    int justGotOperandFromCDB;
     int qj; // ROB index containing source operand 1
     int qk; // ROB index containing source operand 2
     int dest; // the ROB index that will hold the result
@@ -32,7 +33,7 @@ typedef struct ResStationStatusTable {
     ResStationStatusTableEntry **loadEntries;
     ResStationStatusTableEntry **storeEntries;
     ResStationStatusTableEntry **fpAddEntries;
-    ResStationStatusTableEntry **fpMultEntries;
+    ResStationStatusTableEntry **fpMulEntries;
     ResStationStatusTableEntry **fpDivEntries;
     ResStationStatusTableEntry **buEntries;
     
@@ -40,7 +41,7 @@ typedef struct ResStationStatusTable {
     int numLoadStations;
     int numStoreStations;
     int numFPAddStations;
-    int numFPMultStations;
+    int numFPMulStations;
     int numFPDivStations;
     int numBUStations;
 
@@ -60,8 +61,9 @@ int indexForFreeResStationForInstruction(ResStationStatusTable *resStationTable,
 int isFreeResStationForInstruction(ResStationStatusTable *resStationTable, Instruction *inst);
 void addInstToResStation(ResStationStatusTable *resStationTable, RegisterStatusTable *regTable, RegisterFile *regFile, Instruction *inst, int destROB);
 void printResStationStatusTable(ResStationStatusTable *resStationTable);
-void forwardFloatResultToResStationStatusTable(ResStationStatusTable *resStationTable, FloatFUResult *floatResult);
-void setResStationEntryOperandAvailability(ResStationStatusTableEntry *entry, RegisterStatusTable *regTable, RegisterFile *regFile, int sourceNum, int physReg, int resultType);
-void processIntForwardingForResStationEntries(ResStationStatusTableEntry **entries, int numEntries, IntFUResult *intResult);
-void processFloatForwardingForResStationEntries(ResStationStatusTableEntry **entries, int numEntries, FloatFUResult *floatResult);
-void forwardIntResultToResStationStatusTable(ResStationStatusTable *resStationTable, IntFUResult *intResult);
+void setResStationEntryOperandAvailability(ResStationStatusTableEntry *entry, RegisterStatusTable *regTable, RegisterFile *regFile, 
+    int sourceNum, ArchRegister *reg, int renamedReg, int resultType);
+void processIntUpdateForResStationEntries(ResStationStatusTableEntry **entries, int numEntries, int destROB, int result, int fromCDB);
+void processFloatUpdateForResStationEntries(ResStationStatusTableEntry **entries, int numEntries, int destROB, float result, int fromCDB);
+void sendIntUpdateToResStationStatusTable(ResStationStatusTable *resStationTable, int destROB, int result, int fromCDB);
+void sendFloatUpdateToResStationStatusTable(ResStationStatusTable *resStationTable, int destROB, float result, int fromCDB);

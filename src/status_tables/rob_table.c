@@ -20,10 +20,11 @@ void initROBStatusTable(ROBStatusTable *robTable, int NR) {
         entry->busy = 0;
         entry->inst = NULL;
         entry->state = STATE_NONE;
-        entry->dest = NONER;
+        entry->destReg = NULL;
+        entry->renamedDestReg = PHYS_REG_NONE;
         entry->intValue = 0;
         entry->floatValue = 0;
-        entry->instResultValueType = INST_VAL_NONE;
+        entry->instResultValueType = VALUE_TYPE_NONE;
 
         robTable->entries[i] = entry;
     }
@@ -69,7 +70,8 @@ int addInstToROB(ROBStatusTable *robTable, Instruction *inst) {
     entry->busy = 1;
     entry->inst = inst;
     entry->state = STATE_ISSUED;
-    entry->dest = inst->destPhysReg;
+    entry->destReg = inst->destReg;
+    entry->renamedDestReg = inst->destPhysReg;
     entry->intValue = 0;
     entry->floatValue = 0;
 
@@ -77,11 +79,11 @@ int addInstToROB(ROBStatusTable *robTable, Instruction *inst) {
 
     enum InstructionType instType = inst->type;
     if (instType == ADD || instType == ADDI || instType == SLT) {
-        entry->instResultValueType = INST_VAL_INT;
+        entry->instResultValueType = VALUE_TYPE_INT;
     } else if (instType == FLD || instType == FSD || instType == FADD || instType == FSUB || instType == FMUL || instType == FDIV) {
-        entry->instResultValueType = INST_VAL_FLOAT;
+        entry->instResultValueType = VALUE_TYPE_FLOAT;
     } else {
-        entry->instResultValueType = INST_VAL_NONE;
+        entry->instResultValueType = VALUE_TYPE_NONE;
     }
 
     printf("added instruction: %p to ROB entry: %i\n", inst, robIndex);
@@ -96,7 +98,29 @@ void printROBStatusTable(ROBStatusTable *robTable) {
 
     for (int i = 0; i < robTable->NR; i++) {
         ROBStatusTableEntry *entry = robTable->entries[i];
-        printf("\trobIndex: %i, busy: %i, inst: %p, dest: %i, intVal: %i, floatVal: %f, ", entry->index, entry->busy, entry->inst, entry->dest, entry->intValue, entry->floatValue);
-        printf("state: %s, resultType: %s\n", instStateToString(entry->state), instResultTypeToString(entry->instResultValueType));
+        char *destStr = NULL;
+        if (entry->destReg) {
+            destStr = entry->destReg->name;
+        }
+        printf("\trobIndex: %i, busy: %i, inst: %p, dest: %s, renamedDest: %s, intVal: %i, floatVal: %f, ", entry->index, entry->busy, entry->inst, destStr, 
+            physicalRegisterNameToString(entry->renamedDestReg), entry->intValue, entry->floatValue);
+        printf("state: %s, resultType: %s\n", instStateToString(entry->state), valueTypeToString(entry->instResultValueType));
     }
+}
+
+// returns the ROB entry that is currently at the head
+ROBStatusTableEntry *getHeadROBEntry(ROBStatusTable *robTable) {
+    return robTable->entries[robTable->headEntryIndex];
+}
+
+// returns 1 if all robs in the ROB status table are not busy, 0 if any of them are busy
+int isROBEmpty(ROBStatusTable *robTable) {
+
+    for (int i = 0; i < robTable->NR; i++) {
+        if (robTable->entries[i]->busy) {
+            return 0;
+        }
+    } 
+    
+    return 1;
 }

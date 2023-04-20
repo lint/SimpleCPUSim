@@ -30,56 +30,43 @@ enum InstructionType stringToInstructionType(char *s) {
     } else if (!strcmp(s, "bne")) {
         return BNE;
     } else {
-        return NONEI;
+        return INST_TYPE_NONE;
     }
 }
 
-// converts a string to the register name enum
-enum RegisterName stringToRegisterName(char *s) {
+// converts an instruction type enum to string
+char *InstructionTypeToString(enum InstructionType instType) {
 
-    // printf("getting register enum for: %s\n", s);
-
-    int regNum = -1;
-    int offset = s[0] == 'R' ? 0 : 32; // R registers are enum values 0 - 31, F registers are enum values 32 - 63
-    
-    if (!strcmp(s, "PC")) {
-        return PC;
-    } else if (!strcmp(s, "$0")) {
-        return ZERO;
+    if (instType == FLD) {
+        return "fld";
+    } else if (instType == FSD) {
+        return "fsd";
+    } else if (instType == ADD) {
+        return "add";
+    } else if (instType == ADDI) {
+        return "addi";
+    } else if (instType == SLT) {
+        return "slt";
+    } else if (instType == FADD) {
+        return "fadd";
+    } else if (instType == FSUB) {
+        return "fsub";
+    } else if (instType == FMUL) {
+        return "fmul";
+    } else if (instType == FDIV) {
+        return "fdiv";
+    } else if (instType == BNE) {
+        return "bne";
+    } else {
+        return "NONE";
     }
-
-    if (sscanf(s + 1, "%d", &regNum) <= 0) {
-        return NONER;
-    }
-
-    return (enum RegisterName)(regNum + offset);
 }
 
-// converts the register name enum to string
-char *registerEnumToString(enum RegisterName reg) {
+// converts the rename register name enum to string
+char *physicalRegisterNameToString(enum PhysicalRegisterName reg) {
 
-    if (reg == PC) {
-        return "PC";
-    } else if (reg == ZERO) {
-        return "$0";
-    }
-
-    char *str = malloc(4 * sizeof(char)); // potential memory leak if not freed
-    char regType = reg < 32 ? 'R' : 'F';
-    int regNum = reg < 32 ? reg : reg - 32;
-
-    sprintf(str, "%c%d", regType, regNum);
-
-    return str;
-}
-
-// converts the physical register name enum to string
-char *physicalRegisterEnumToString(enum PhysicalRegisterName reg) {
-
-    if (reg == PHYS_PC) {
-        return "PHYS_PC";
-    } else if (reg == PHYS_ZERO) {
-        return "p_$0";
+    if (reg < 0) {
+        return "NONE";
     }
 
     char *str = malloc(4 * sizeof(char));
@@ -103,11 +90,11 @@ char *instStateToString(enum InstructionState state) {
     }
 }
 
-// converts the instruction result value type to string
-char *instResultTypeToString(enum InstructionResultValueType type) {
-    if (type == INST_VAL_FLOAT) {
+// converts the value type to string
+char *valueTypeToString(enum ValueType type) {
+    if (type == VALUE_TYPE_FLOAT) {
         return "float";
-    } else if (type == INST_VAL_INT) {
+    } else if (type == VALUE_TYPE_INT) {
         return "int";
     } else {
         return "NONE";
@@ -116,11 +103,11 @@ char *instResultTypeToString(enum InstructionResultValueType type) {
 
 // converts the functional unit operations enum to string
 char *fuOpToString(enum FunctionalUnitOperations op) {
-    if (op == FUOp_ADD) {
+    if (op == FU_OP_ADD) {
         return "add";
-    } else if (op == FUOp_SUB) {
+    } else if (op == FU_OP_SUB) {
         return "sub";
-    } else if (op == FUOp_SLT) {
+    } else if (op == FU_OP_SLT) {
         return "slt";
     } else {
         return "NONE";
@@ -129,19 +116,19 @@ char *fuOpToString(enum FunctionalUnitOperations op) {
 
 // converts the functional unit type to string
 char *fuTypeToString(enum FunctionalUnitType fuType) {
-    if (fuType == FUType_LOAD) {
+    if (fuType == FU_TYPE_LOAD) {
         return "FU_FSD";
-    } else if (fuType == FUType_STORE) {
+    } else if (fuType == FU_TYPE_STORE) {
         return "FU_STORE";
-    } else if (fuType == FUType_INT) {
+    } else if (fuType == FU_TYPE_INT) {
         return "FU_INT";
-    } else if (fuType == FUType_FPAdd) {
+    } else if (fuType == FU_TYPE_FPADD) {
         return "FU_FPADD";
-    } else if (fuType == FUType_FPMult) {
-        return "FU_FPMULT";
-    } else if (fuType == FUType_FPDiv) {
+    } else if (fuType == FU_TYPE_FPMUL) {
+        return "FU_FPMUL";
+    } else if (fuType == FU_TYPE_FPDIV) {
         return "FU_FPDIV";
-    } else if (fuType == FUType_BU) {
+    } else if (fuType == FU_TYPE_BU) {
         return "FU_BU";
     } else {
         return "NONE";
@@ -149,11 +136,11 @@ char *fuTypeToString(enum FunctionalUnitType fuType) {
 }
 
 // converts the val produced by enum to string
-char *valProducedByToString(enum ValProducedBy producedBy) {
-    if (producedBy == VAL_FROM_FU) {
-        return "VAL_FROM_FU";
-    } else if (producedBy == VAL_FROM_ROB) {
-        return "VAL_FROM_ROB";
+char *valueProducedByToString(enum ValueProducedBy producedBy) {
+    if (producedBy == VALUE_FROM_FU) {
+        return "VALUE_FROM_FU";
+    } else if (producedBy == VALUE_FROM_ROB) {
+        return "VALUE_FROM_ROB";
     } else {
         return "NONE";
     }
@@ -161,6 +148,50 @@ char *valProducedByToString(enum ValProducedBy producedBy) {
 
 // prints the contents of an instruction
 void printInstruction(Instruction inst) {
-    printf("instruction: label: %s, type: %i, imm: %i, destReg: %i, sourceReg1: %i, sourceReg2: %i, destPhysReg: %i, source1PhysReg: %i, source2PhysReg: %i, branchTargetAddr: %i, branchTargetLabel: %s\n", 
-                inst.label, inst.type, inst.imm, inst.destReg, inst.source1Reg, inst.source2Reg, inst.destPhysReg, inst.source1PhysReg, inst.source2PhysReg, inst.branchTargetAddr, inst.branchTargetLabel);
+
+    // TODO printing certain instructions got messed up for some reason...
+    // like the add R1, R1, R1??? and it was sourcereg2 that did it i think hmm
+
+    printf("instruction: label: %s, type: %i, imm: %i, destReg: %s, sourceReg1: %s, sourceReg2: %s, \n", 
+        inst.label, inst.type, inst.imm, inst.destReg->name, inst.source1Reg->name, inst.source2Reg->name);
+    printf("renamedDest: %s, renamedSource1: %s, renamedSource2: %s, branchTargetAddr: %i, branchTargetLabel: %s\n", 
+        physicalRegisterNameToString(inst.destPhysReg), physicalRegisterNameToString(inst.source1PhysReg), physicalRegisterNameToString(inst.source2PhysReg), 
+        inst.branchTargetAddr, inst.branchTargetLabel);
+}
+
+ArchRegister *stringToArchRegister(char *s) {
+
+    ArchRegister *reg = malloc(sizeof(ArchRegister));
+    strcpy(reg->name, s);
+
+    if (!strcmp(s, "PC")) {
+        reg->regType = ARCH_REG_PC;
+        reg->num = -1;
+    } else if (!strcmp(s, "$0")) {
+        reg->regType = ARCH_REG_ZERO;
+        reg->num = -1;
+    } else {
+        if (s[0] == 'R') {
+            reg->regType = VALUE_TYPE_INT;
+        } else if (s[0] == 'F') {
+            reg->regType = VALUE_TYPE_FLOAT;
+        } else {
+            printf("error: could not create ArchRegister struct for the given input register: %s\n", s);
+            free(reg);
+            return NULL;
+        }
+
+        if (sscanf(s + 1, "%d", &reg->num) <= 0) {
+            printf("error: could not create ArchRegister struct for the given input register: '%s' due to an invalid\n", s);
+            return NULL;
+        }
+    }
+    
+    return reg;
+} 
+
+// helper method which determines if two ArchRegister structs are equal
+int archRegistersAreEqual(ArchRegister *reg1, ArchRegister *reg2) {
+    // printf("arch registers are equal: %p and %p\n", reg1, reg2);
+    return reg1->regType == reg2->regType && reg1->num == reg2->num;
 }
