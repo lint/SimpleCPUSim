@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include "cpu.h"
-#include "types/types.h"
+#include "misc/misc.h"
 #include "memory/memory.h"
 
 // populates the params struct with values from a config file

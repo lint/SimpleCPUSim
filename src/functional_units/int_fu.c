@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../status_tables/status_tables.h"
-#include "../types/types.h"
+#include "../misc/misc.h"
 #include "int_fu.h"
 
 // initialize a INT functional unit struct

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../types/types.h"
+#include "../misc/misc.h"
 #include "res_station_table.h"
 #include "register_table.h"
 #include "../memory/memory.h"

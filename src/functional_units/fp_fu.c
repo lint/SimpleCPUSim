@@ -4,7 +4,7 @@
 #include <string.h>
 #include "fp_fu.h"
 #include "../status_tables/status_tables.h"
-#include "../types/types.h"
+#include "../misc/misc.h"
 
 // initialize a floating point functional unit
 void initFPFunctionalUnit(FPFunctionalUnit *fpFU, enum FunctionalUnitType fuType, int latency) {

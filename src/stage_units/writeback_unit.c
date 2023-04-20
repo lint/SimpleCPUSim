@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../types/types.h"
+#include "../misc/misc.h"
 #include "../status_tables/status_tables.h"
 #include "../functional_units/functional_units.h"
 #include "../memory/memory.h"

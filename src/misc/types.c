@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "types.h"
+#include "enums.h"
 
 // converts a string to the instruction type enum
 enum InstructionType stringToInstructionType(char *s) {

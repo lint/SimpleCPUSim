@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../types/types.h"
+#include "../misc/misc.h"
 #include "register_table.h"
 
 // initialize the register status table

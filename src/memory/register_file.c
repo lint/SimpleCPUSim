@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../types/types.h"
+#include "../misc/misc.h"
 
 #include "register_file.h"
 
@@ -75,7 +75,7 @@ float readRegisterFileFloat(RegisterFile *registerFile, enum PhysicalRegisterNam
     entry->valueType = VALUE_TYPE_FLOAT;
 
     printf("read register: %s, float: %f\n", physicalRegisterNameToString(reg), entry->floatVal);
-    
+
     return entry->floatVal;
 }
 

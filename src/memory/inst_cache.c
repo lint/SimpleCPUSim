@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "inst_cache.h"
-#include "../types/types.h"
+#include "../misc/misc.h"
 
 // initialize a struct representing the instruction cache
 void initInstCache(InstCache *instCache) {

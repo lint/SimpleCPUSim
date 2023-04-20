@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../types/types.h"
+#include "../misc/misc.h"
 #include "rob_table.h"
 
 // initialize the rob table struct
@@ -121,6 +121,6 @@ int isROBEmpty(ROBStatusTable *robTable) {
             return 0;
         }
     } 
-    
+
     return 1;
 }

@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "cpu.h"
-#include "types/types.h"
+#include "misc/misc.h"
 #include "memory/memory.h"
 #include "stage_units/stage_units.h"
 #include "status_tables/status_tables.h"
@@ -268,9 +268,9 @@ void executeCPU(CPU *cpu) {
         cpu->cycle++;
     }
 
-    printf("executed cycles: %i\n", cpu->cycle);
     printRegisterFile(cpu->registerFile);
     printStallStats(cpu->stallStats);
+    printf("executed cycles: %i\n", cpu->cycle);
 
     teardownCPU(cpu);
 }

@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "decode_unit.h"
-#include "../types/types.h"
+#include "../misc/misc.h"
 #include "../cpu.h"
 #include "../status_tables/status_tables.h"
 

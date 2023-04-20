@@ -5,7 +5,7 @@
 #include "fetch_unit.h"
 #include "../cpu.h"
 #include "../memory/memory.h"
-#include "../types/types.h"
+#include "../misc/misc.h"
 
 // initialize the fetch unit struct
 void initFetchUnit(FetchUnit *fetchUnit, int NF, Instruction **instFetchBuffer, int *instFetchBufferSize, int *numInstsInBuffer) {
