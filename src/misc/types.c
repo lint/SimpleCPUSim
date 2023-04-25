@@ -122,7 +122,7 @@ char *fuOpToString(enum FunctionalUnitOperations op) {
 // converts the functional unit type to string
 char *fuTypeToString(enum FunctionalUnitType fuType) {
     if (fuType == FU_TYPE_LOAD) {
-        return "FU_FSD";
+        return "FU_LOAD";
     } else if (fuType == FU_TYPE_STORE) {
         return "FU_STORE";
     } else if (fuType == FU_TYPE_INT) {
@@ -212,6 +212,6 @@ ArchRegister *stringToArchRegister(char *s) {
 
 // helper method which determines if two ArchRegister structs are equal
 int archRegistersAreEqual(ArchRegister *reg1, ArchRegister *reg2) {
-    // printf("arch registers are equal: %p and %p\n", reg1, reg2);
+    printf("arch registers are equal: %p and %p\n", reg1, reg2);
     return reg1->regType == reg2->regType && reg1->num == reg2->num;
 }

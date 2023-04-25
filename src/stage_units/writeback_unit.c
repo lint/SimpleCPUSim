@@ -7,7 +7,9 @@
 #include "../functional_units/functional_units.h"
 #include "../memory/memory.h"
 #include "../branch_prediction/branch_predictor.h"
+#include "mem_unit.h"
 #include "writeback_unit.h"
+#include "fetch_unit.h"
 #include "decode_unit.h"
 
 // initialize a writeback unit struct
@@ -43,6 +45,7 @@ void initWritebackUnit(WritebackUnit *writebackUnit, int NB, int NR) {
         info->producingFUType = FU_TYPE_NONE;
         info->robIndex = i;
         info->valueType = VALUE_TYPE_NONE;
+        info->addr = -1;
 
         writebackUnit->robWBInfoArr[i] = info;
     }
@@ -83,6 +86,7 @@ void resetWritebackUnitROBWBInfo(WritebackUnit *writebackUnit) {
         info->producingFUType = FU_TYPE_NONE;
         info->valueType = VALUE_TYPE_NONE;
         info->robIndex = i;
+        info->addr = -1;
     }
 }
 
@@ -93,14 +97,14 @@ void updateWritebackUnitWaitingForROB(WritebackUnit *writebackUnit, ResStationSt
     for (int i = 0; i < numEntries; i++) {
         ResStationStatusTableEntry *entry = resStationEntries[i];
 
-        printf("entry: %p, \n", entry);
+        // printf("entry: %p, \n", entry);
 
         // increase the counter for the source ROB if the operand is not available
         if (entry->busy) {
-            if (!entry->vjIsAvailable) {
+            if (!entry->vjIsAvailable && entry->qj != -1) {
                 writebackUnit->robWBInfoArr[entry->qj]->numOperandsWaiting++;
             }
-            if (!entry->vkIsAvailable) {
+            if (!entry->vkIsAvailable && entry->qk != -1) {
                 writebackUnit->robWBInfoArr[entry->qk]->numOperandsWaiting++;
             }
         }
@@ -140,8 +144,11 @@ void addROBEntryToCDB(WritebackUnit *writebackUnit, ROBStatusTableEntry *entry) 
     cdb->valueType = entry->instResultValueType;
     cdb->producingFUType = entry->fuType;
 
-    if (entry->fuType == FU_TYPE_BU) {
-        cdb->buAddr = entry->addr;
+    if (entry->fuType == FU_TYPE_BU) { // TODO: don't really need the load address on the CDB right?
+        cdb->addr = entry->addr;
+    } else if (entry->fuType == FU_TYPE_STORE || entry->fuType == FU_TYPE_LOAD) {
+        cdb->addr = entry->addr;
+        cdb->floatVal = entry->floatValue;
     } else {
         if (cdb->valueType == VALUE_TYPE_INT) {
             cdb->intVal = entry->intValue;
@@ -155,8 +162,8 @@ void addROBEntryToCDB(WritebackUnit *writebackUnit, ROBStatusTableEntry *entry) 
 }
 
 // perform writeback unit operations during a cycle
-void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, StatusTables *statusTables, 
-    FunctionalUnits *functionalUnits, RegisterFile *registerFile, BranchPredictor *branchPredictor) {
+void cycleWritebackUnit(WritebackUnit *writebackUnit, FetchUnit *fetchUnit, DecodeUnit *decodeUnit, MemoryUnit *memUnit, StatusTables *statusTables, 
+    FunctionalUnits *functionalUnits, RegisterFile *registerFile, DataCache *dataCache, BranchPredictor *branchPredictor) {
 
     printf("\nperforming writeback unit operations...\n");
 
@@ -179,6 +186,8 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
 
     resetWritebackUnitROBWBInfo(writebackUnit);
 
+    // make sure you don't overfill cdb without checking capacity
+
     // check and see if the head of the ROB is able to be added to the CDB to be committed
     int numInstsToCommit = 0;
     // ROBStatusTableEntry *headROBEntry = getHeadROBEntry(robTable);
@@ -191,7 +200,7 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
 
     // TODO: Cleanup
 
-        // if CDB still has space available, try to add more instructions to commit
+    // if CDB still has space available, try to add more instructions to commit
     if (writebackUnit->cdbsUsed < writebackUnit->NB) {
 
         // printf("space remaining in CDB, attempting to add more instructions to commit\n");
@@ -211,6 +220,36 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
         }
     }
 
+    // check the produced results from the memory unit
+    LSFUResult *currLSFUResult = getMemoryUnitCurrentResult(memUnit);
+    if (currLSFUResult) {
+        printf("destROB: %i, address: %i, fuType: %s, value: %f\n", currLSFUResult->destROB, currLSFUResult->resultAddr, fuTypeToString(currLSFUResult->fuType), currLSFUResult->loadValue);
+
+        ROBStatusTableEntry *entry = robTable->entries[currLSFUResult->destROB];
+        ROBWBInfo *info = writebackUnit->robWBInfoArr[currLSFUResult->destROB];
+
+        if (info->producedBy != VALUE_FROM_NONE) {
+            printf("error: destination ROB found in functional unit was already seen, this shouldn't happen...\n");
+            // TOOD: return or exit?
+        }
+
+        info->producedBy = VALUE_FROM_FU; // actually need the value from mem???
+        info->producingFUType = currLSFUResult->fuType;
+        // info->intVal = currIntFUResult->result;
+        if (info->producingFUType == FU_TYPE_LOAD) {
+            info->floatVal = currLSFUResult->loadValue;
+            info->valueType = VALUE_TYPE_FLOAT;
+        }
+        info->addr = currLSFUResult->resultAddr;
+
+        // stall functional unit by default and remove the stall later if its result is placed on the CDB
+        // functionalUnits->lsFU->isStalled = 1;
+        memUnit->isStalledFromWB = 1;
+
+    } else {
+        printf("no result available from memory unit\n");
+    }
+
     // check the produced results from INT functional unit
     IntFUResult *currIntFUResult = getCurrentIntFunctionalUnitResult(functionalUnits->intFU);
     if (currIntFUResult) {
@@ -220,7 +259,7 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
         ROBWBInfo *info = writebackUnit->robWBInfoArr[currIntFUResult->destROB];
 
         // only perform actions if the destination rob table is busy (discards results heading to flushed ROB)
-        if (entry->busy) {
+        // if (entry->busy) { // TODO: is this necessary anymore? since you already remove everything from all the units -> also in every other FU check
 
             if (info->producedBy != VALUE_FROM_NONE) {
                 printf("error: destination ROB found in functional unit was already seen, this shouldn't happen...\n");
@@ -234,9 +273,9 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
 
             // stall functional unit by default and remove the stall later if its result is placed on the CDB
             functionalUnits->intFU->isStalled = 1;
-        } else {
-            printf("\tdestROB: %i is not busy, ignoring results\n", currIntFUResult->destROB);
-        }
+        // } else {
+        //     printf("\tdestROB: %i is not busy, ignoring results\n", currIntFUResult->destROB);
+        // }
     } else {
         printf("no result available from INT functional unit\n");
     }
@@ -250,7 +289,7 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
         ROBWBInfo *info = writebackUnit->robWBInfoArr[currFPAddFUResult->destROB];
 
         // only perform actions if the destination rob table is busy (discards results heading to flushed ROB)
-        if (entry->busy) {
+        // if (entry->busy) {
 
             if (info->producedBy != VALUE_FROM_NONE) {
                 printf("error: destination ROB found in functional unit was already seen, this shouldn't happen...\n");
@@ -264,9 +303,9 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
 
             // stall functional unit by default and remove the stall later if its result is placed on the CDB
             functionalUnits->fpAddFU->isStalled = 1;
-        } else {
-            printf("\tdestROB: %i is not busy, ignoring results\n", currFPAddFUResult->destROB);
-        }
+        // } else {
+        //     printf("\tdestROB: %i is not busy, ignoring results\n", currFPAddFUResult->destROB);
+        // }
     } else {
         printf("no result available from FPAdd functional unit\n");
     }
@@ -280,7 +319,7 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
         ROBWBInfo *info = writebackUnit->robWBInfoArr[currFpMulFUResult->destROB];
 
         // only perform actions if the destination rob table is busy (discards results heading to flushed ROB)
-        if (entry->busy) {
+        // if (entry->busy) {
 
             if (info->producedBy != VALUE_FROM_NONE) {
                 printf("error: destination ROB found in functional unit was already seen, this shouldn't happen...\n");
@@ -294,9 +333,9 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
 
             // stall functional unit by default and remove the stall later if its result is placed on the CDB
             functionalUnits->fpMulFU->isStalled = 1;
-        } else {
-            printf("\tdestROB: %i is not busy, ignoring results\n", currFpMulFUResult->destROB);
-        }
+        // } else {
+        //     printf("\tdestROB: %i is not busy, ignoring results\n", currFpMulFUResult->destROB);
+        // }
     } else {
         printf("no result available from FPMul functional unit\n");
     }
@@ -310,7 +349,7 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
         ROBWBInfo *info = writebackUnit->robWBInfoArr[currFpDivFUResult->destROB];
 
         // only perform actions if the destination rob table is busy (discards results heading to flushed ROB)
-        if (entry->busy) {
+        // if (entry->busy) {
 
             if (info->producedBy != VALUE_FROM_NONE) {
                 printf("error: destination ROB found in functional unit was already seen, this shouldn't happen...\n");
@@ -324,9 +363,9 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
     
             // stall functional unit by default and remove the stall later if its result is placed on the CDB
             functionalUnits->fpDivFU->isStalled = 1;
-        } else {
-            printf("\tdestROB: %i is not busy, ignoring results\n", currFpDivFUResult->destROB);
-        }
+        // } else {
+        //     printf("\tdestROB: %i is not busy, ignoring results\n", currFpDivFUResult->destROB);
+        // }
     } else {
         printf("no result available from FPDiv functional unit\n");
     }
@@ -339,27 +378,30 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
         ROBStatusTableEntry *entry = robTable->entries[currBUFUResult->destROB];
         
         // only perform actions if the destination rob table is busy (discards results heading to flushed ROB)
-        if (entry->busy) {
+        if (/*entry->busy &&*/ writebackUnit->cdbsUsed < writebackUnit->NB) {
 
-            // always place BU result on CDB if result is available
+            // always try to place BU result on CDB if result is available
             CDB *cdb = writebackUnit->cdbs[writebackUnit->cdbsUsed++];
             cdb->producingFUType = FU_TYPE_BU;
             cdb->destPhysReg = PHYS_REG_NONE;
             cdb->valueType = VALUE_TYPE_NONE;
             cdb->producedBy = VALUE_FROM_FU;
             cdb->robIndex = currBUFUResult->destROB;
-            cdb->buAddr = currBUFUResult->effAddr;
+            cdb->addr = currBUFUResult->effAddr;
             cdb->buTookBranch = currBUFUResult->isBranchTaken;
+
+            functionalUnits->buFU->isStalled = 0;
 
         } else {
             printf("\tdestROB: %i is not busy, ignoring results\n", currBUFUResult->destROB);
+            functionalUnits->buFU->isStalled = 1;
         }
 
     } else {
         printf("no result available from BU functional unit\n");
     }
 
-    // TODO: need to add every other functional unit here as well
+    // TODO: need to add every other functional unit here as well - done?
 
     // increase the robsNeededBy counters for every functional unit's reservation stations
     updateWritebackUnitWaitingForROB(writebackUnit, resStationTable->intEntries, resStationTable->numIntStations);
@@ -369,6 +411,8 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
     updateWritebackUnitWaitingForROB(writebackUnit, resStationTable->fpMulEntries, resStationTable->numFPMulStations);
     updateWritebackUnitWaitingForROB(writebackUnit, resStationTable->fpDivEntries, resStationTable->numFPDivStations);
     updateWritebackUnitWaitingForROB(writebackUnit, resStationTable->buEntries, resStationTable->numBUStations);
+    updateWritebackUnitWaitingForROB(writebackUnit, resStationTable->loadEntries, resStationTable->numLoadStations);
+    updateWritebackUnitWaitingForROB(writebackUnit, resStationTable->storeEntries, resStationTable->numStoreStations);
 
     printWritebackUnitROBInfo(writebackUnit);
 
@@ -415,6 +459,7 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
             cdb->producedBy = VALUE_FROM_FU;
             cdb->robIndex = maxOpsROB;
             cdb->producingFUType = info->producingFUType;
+            cdb->addr = info->addr;
             
             if (info->valueType == VALUE_TYPE_INT) {
                 cdb->intVal = info->intVal;
@@ -500,12 +545,20 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
             ResStationStatusTableEntry *resStationEntry = resStationEntryForFunctionalUnitWithDestROB(resStationTable, cdb->producingFUType, cdb->robIndex);
             resStationEntry->busy = 0;
 
-            // don't actually stall the functional unit
+            // don't actually stall the functional units (among other things)
             if (cdb->producingFUType == FU_TYPE_INT) {
                 functionalUnits->intFU->isStalled = 0;
             } else if (cdb->producingFUType == FU_TYPE_LOAD) {
-
+                memUnit->isStalledFromWB = 0;
             } else if (cdb->producingFUType == FU_TYPE_STORE) {
+                memUnit->isStalledFromWB = 0;
+
+                robStatusEntry->addr = cdb->addr;
+                robStatusEntry->floatValue = resStationEntry->vjFloat;
+
+                // forward the float value to the memory unit for the subsequent load to use
+                // this works (and doesn't need to do any checking for if there are two stores to the same address) since the only time a load will see the forwarded result
+                forwardDataToMemoryUnit(memUnit, robStatusEntry->floatValue, robStatusEntry->addr);
 
             } else if (cdb->producingFUType == FU_TYPE_FPADD) {
                 functionalUnits->fpAddFU->isStalled = 0;
@@ -515,13 +568,14 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
                 functionalUnits->fpDivFU->isStalled = 0;
             } else if (cdb->producingFUType == FU_TYPE_BU) {
                 // do not need to remove stall from BU functional unit as it is never added in the first place, since it is always added to the CDB if a result is available
-
-                robStatusEntry->addr = cdb->buAddr;
+                // TODO: hmm
+                functionalUnits->buFU->isStalled = 0;
+                robStatusEntry->addr = cdb->addr;
             } else {
                 printf("error: invalid FUType when removing stall from functional unit for CDB: %i\n", i);
             }
 
-            // TODO: again this for ever functional unit
+            // TODO: again this for ever functional unit - done?
         
         // value came from the ROB (instruction will commit)
         } else if (cdb->producedBy == VALUE_FROM_ROB) {
@@ -544,16 +598,16 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
                 if (cdb->producingFUType == FU_TYPE_BU) {
                     printf("CDB: %i contains value from ROB, updating ROB: %i to COMMITED and updating branch predictor and ROB\n", i, cdb->robIndex);
 
-                    printf("\n\n\ncdb->buAddr: %i, predictNextPC: %i\n\n\n", cdb->buAddr, predictNextPC(branchPredictor, robStatusEntry->inst->addr));
+                    printf("\n\n\ncdb->addr: %i, predictNextPC: %i\n\n\n", cdb->addr, predictNextPC(branchPredictor, robStatusEntry->inst->addr));
 
                     // check if the branch prediction was correct
-                    if (cdb->buAddr == predictNextPC(branchPredictor, robStatusEntry->inst->addr)) { 
+                    if (cdb->addr == predictNextPC(branchPredictor, robStatusEntry->inst->addr)) { 
                         
                         // update the state of the branch predictor that the speculated branch was correct
                         updateBranchPredictor(branchPredictor, 1);
 
                         // update BTB
-                        updateBTBEntry(branchPredictor, robStatusEntry->inst->addr, cdb->buAddr);
+                        updateBTBEntry(branchPredictor, robStatusEntry->inst->addr, cdb->addr);
 
                     // branch prediction was incorrect
                     } else {
@@ -562,24 +616,42 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
                         updateBranchPredictor(branchPredictor, 0);
 
                         // update BTB
-                        updateBTBEntry(branchPredictor, robStatusEntry->inst->addr, cdb->buAddr);
+                        updateBTBEntry(branchPredictor, robStatusEntry->inst->addr, cdb->addr);
 
                         printFreeList(decodeUnit);
                         printMapTable(decodeUnit);
+                        printROBStatusTable(robTable);
 
                         // add all allocated physical registers back to the free list
-                        for (int robCount = 0; robCount < robTable->NR; robCount++) {
-                            int index = (robTable->NR + robTable->headEntryIndex - robCount) % robTable->NR;
-                            ROBStatusTableEntry *robEntryToReset = robTable->entries[index];
+                        for (int i = (robTable->headEntryIndex + 1) % robTable->NR; i != robTable->headEntryIndex; i = (i + 1) % robTable->NR) {
+                            // int index = (robTable->NR + robTable->headEntryIndex - robCount) % robTable->NR;
+                            ROBStatusTableEntry *robEntryToReset = robTable->entries[i];
+                            Instruction *inst = robEntryToReset->inst;
 
-                            printf("rob entry to reset: %i\n", index);
+                            printf("rob entry to reset: %i\n", i);
+                            if (inst) {
+                                enum InstructionType instType = inst->type;
 
-                            if (robEntryToReset->busy && robEntryToReset->destReg) {
-                                popNewPhysicalRegisterMappingForReg(decodeUnit, robEntryToReset->destReg, 0);
+                                if (instType == ADDI || instType == ADD || instType == SLT || instType == FLD 
+                                    || instType == FADD || instType == FSUB || instType == FDIV || instType == FMUL ) {
+                                    
+                                    // printf("rob entry to reset: %i for inst: %s\n", index, robEntryToReset->inst->fullStr);
+                                    // printf("rob entry: %p\n", robEntryToReset);
+                                    // // prin/tf()
+                                    // printf("rob inst: %p\n", robEntryToReset->inst);
+                                    // printf("rob inst: %s\n", robEntryToReset->inst->fullStr);
+
+
+                                    if (robEntryToReset->busy && robEntryToReset->destReg) {
+                                        popNewPhysicalRegisterMappingForReg(decodeUnit, robEntryToReset->destReg, 0);
+                                    }
+                                }
                             }
+
                         }
 
-                        flushFetchBufferAndDecodeQueue(decodeUnit);
+                        flushDecodeQueue(decodeUnit);
+                        flushFetchBuffer(fetchUnit);
 
                         printFreeList(decodeUnit);
                         printMapTable(decodeUnit);
@@ -588,13 +660,13 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
                         flushROB(robTable);
 
                         // flush the register status table
-                        resetRegisterStatusTable(regTable);
+                        flushRegisterStatusTable(regTable);
                         
                         // flush the reservation station status table
                         flushResStationStatusTable(resStationTable);
 
                         // write the correct PC value to the register file
-                        writeRegisterFileInt(registerFile, PHYS_REG_PC, cdb->buAddr);
+                        writeRegisterFileInt(registerFile, PHYS_REG_PC, cdb->addr);
 
                         // reset functional units
                         flushBUFunctionalUnit(functionalUnits->buFU);
@@ -602,10 +674,16 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
                         flushFPFunctionalUnit(functionalUnits->fpAddFU);
                         flushFPFunctionalUnit(functionalUnits->fpMulFU);
                         flushFPFunctionalUnit(functionalUnits->fpDivFU);
+                        flushLSFunctionalUnit(functionalUnits->lsFU);
+                        flushMemUnit(memUnit);
 
                         // TODO: flush remaining functional units when you add them
 
                         // do not process any more cdb values
+
+                        printf("\tupdating ROB head from: %i to ", robTable->headEntryIndex );
+                        robTable->headEntryIndex = (robStatusEntry->index+1) % robTable->NR;
+                        printf(" %i\n", robTable->headEntryIndex);
                         break;                        
                     }
 
@@ -624,14 +702,21 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
                     RegisterStatusTableEntry *regStatusEntry = registerStatusTableEntryForReg(regTable, robStatusEntry->destReg);
 
                     // reset the register status table entry if the committed instruction's destination ROB matches the current entry's ROB
-                    if (regStatusEntry->robIndex == robStatusEntry->index) {
+                    if (regStatusEntry && regStatusEntry->robIndex == robStatusEntry->index) {
                         regStatusEntry->robIndex = -1;
                     }
 
-                    // TODO: loads/stores/branches
-
-                    // update free list
-                    popOldPhysicalRegisterMappingForReg(decodeUnit, robStatusEntry->destReg, 1);
+                    // only pop if the free list contains an older value
+                    
+                    // the issue was caused because the value was popped off the free list (and it wasn't prevented because another instruction was issued for that register, which then got removed due to branch misprediction, resulting in having 0 mappings for the committed value)
+                    // how do i solve this then....
+                    // check the rob status table?
+                    // if one of the values has not been committed?
+                    
+                    // do not try to pop BNE and FSD destination registers
+                    if (robStatusEntry->destReg) {
+                        popOldPhysicalRegisterMappingForReg(decodeUnit, robTable, robStatusEntry->destReg, 1);
+                    }
 
                     // update register file
                     if (cdb->valueType == VALUE_TYPE_INT) {
@@ -641,11 +726,18 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, St
                         printf("\tcommiting: %f to register: %s\n", cdb->floatVal, physicalRegisterNameToString(cdb->destPhysReg));
                         writeRegisterFileFloat(registerFile, cdb->destPhysReg, cdb->floatVal);
                     }
+
+                    // update memory if committing a store
+                    if (cdb->producingFUType == FU_TYPE_STORE) {
+                        printf("\twriting %f to memory address: %i\n", cdb->floatVal, cdb->addr);
+                        writeFloatToDataCache(dataCache, cdb->addr, cdb->floatVal);
+                    }
                 }
             // }
 
+            printf("\tupdating ROB head from: %i to ", robTable->headEntryIndex );
             robTable->headEntryIndex = (robStatusEntry->index+1) % robTable->NR;
-            printf("\tupdating ROB head index to: %i\n", robTable->headEntryIndex);
+            printf(" %i\n", robTable->headEntryIndex);
         }
     }
 

@@ -10,8 +10,6 @@
 void initLSFunctionalUnit(LSFunctionalUnit *lsFU, int latency) {
 
     lsFU->latency = latency;
-    lsFU->lastSelectedResStation = -1;
-    lsFU->didLastSelectLoad = 0;
     lsFU->stages = malloc(lsFU->latency * sizeof(LSFUResult *)); 
     lsFU->stages[0] = NULL;
     lsFU->isStalled = 0;
@@ -33,7 +31,7 @@ LSFUResult *getCurrentLSFunctionalUnitResult(LSFunctionalUnit *lsFU) {
 
 // helper method to print the contents of the int functional unit
 void printLSFunctionalUnit(LSFunctionalUnit *lsFU) {
-    printf("int functional unit: latency: %i lastSelectedResStation: %i isStalled: %i\n", lsFU->latency, lsFU->lastSelectedResStation, lsFU->isStalled);
+    printf("int functional unit: latency: %i isStalled: %i\n", lsFU->latency, lsFU->isStalled);
 
     for (int i = 0; i < lsFU->latency; i++) {
         printf("\tstage: %i, ", i);
@@ -59,145 +57,114 @@ void flushLSFunctionalUnit(LSFunctionalUnit *lsFU) {
     lsFU->isStalled = 0;
 }
 
-// tries to read the load buffer to bring a new entry into the functional unit, returns 1 if successful, 0 if not
-int readLoadReservationStations(LSFunctionalUnit *lsFU, StatusTables *statusTables) {
-
-    ResStationStatusTable *resStationTable = statusTables->resStationTable;
-    ROBStatusTable *robTable = statusTables->robTable;
-
-    ResStationStatusTableEntry **resStationEntries = resStationEntriesForFunctionalUnit(resStationTable, FU_TYPE_LOAD);
-    int numResStations = numResStationsForFunctionalUnit(resStationTable, FU_TYPE_LOAD);
-    int nextResStation = (lsFU->lastSelectedResStation + 1) % numResStations;
-    LSFUResult *nextResult = NULL;
-
-    // iterate over all reservation stations to find the next operands to operate on
-    for (int i = 0; i < numResStations; i++) {
-
-        // get the reservation station entry's destination ROB and use it to get the assocaited ROB entry
-        ResStationStatusTableEntry *resStationEntry = resStationEntries[nextResStation];
-        int destROB = resStationEntry->dest;
-        ROBStatusTableEntry *robEntry = robTable->entries[destROB];
-
-        // do not allow instructions that just received a value from the CDB to execute in the same cycle
-        if (resStationEntry->busy && resStationEntry->justGotOperandFromCDB) {
-            resStationEntry->justGotOperandFromCDB = 0;
-            nextResStation = (nextResStation + 1) % numResStations;
-            continue;
-        }
-
-        // if both operands of the reservation station and the instruction's state is "issued" then it can be brought into the functional unit
-        if (resStationEntry->busy && (resStationEntry->vjIsAvailable && resStationEntry->vkIsAvailable) && robEntry->state == INST_STATE_ISSUED) {
-
-            printf("selecting reservation station: INT[%d] for execution\n", resStationEntry->resStationIndex);
-            
-            lsFU->lastSelectedResStation = nextResStation;
-
-            // update entry in ROB to "executing"
-            robEntry->state = INST_STATE_EXECUTING;
-
-            // allocate and initialize the next result which will get passed through the stages of the functional unit
-            nextResult = malloc(sizeof(LSFUResult));
-            nextResult->source1 = resStationEntry->vjInt;
-            nextResult->source2 = resStationEntry->vkInt;
-            nextResult->destROB = destROB;
-
-            // perform the calculation for different possible operations
-            if (resStationEntry->op == FU_OP_ADD) {
-                nextResult->result = nextResult->source1 + nextResult->source2;
-            } else if (resStationEntry->op == FU_OP_SUB) {
-                nextResult->result = nextResult->source1 - nextResult->source2;
-            } else if (resStationEntry->op == FU_OP_SLT) {
-                nextResult->result = nextResult->source1 < nextResult->source2;
-            } else {
-                printf("error: tried to start executing an instruction in the INT functional unit with an invalid operation\n");
-                exit(1);
-            }
-
-            break;
-        }
-        
-        nextResStation = (nextResStation + 1) % numResStations;
-    }
-
-
-}
-
-// tries to read the store buffer to bring a new entry into the functional unit, returns 1 if successful, 0 if not
-int readStoreReservationStations(LSFunctionalUnit *lsFU, StatusTables *statusTables) {
-
-} 
-
-// perform INT functional unit operations during a cycle
+// perform load/store functional unit operations over a cycle
 void cycleLSFunctionalUnit(LSFunctionalUnit *lsFU, StatusTables *statusTables) {
-    printf("\nperforming int functional unit operations...\n");
 
+    printf("\nperforming load/store functional unit operations...\n");
+    
     if (lsFU->isStalled) {
-        printf("\n load/store functional unit is stalled\n");
+        printf("\tload/store functional unit is stalled because its result was not taken by the memory unit\n");
         return;
     }
 
-    // need to read both load and store queues
-
     ResStationStatusTable *resStationTable = statusTables->resStationTable;
     ROBStatusTable *robTable = statusTables->robTable;
 
-    ResStationStatusTableEntry **resStationEntries = resStationEntriesForFunctionalUnit(resStationTable, lsFU->fuType);
-    int numResStations = numResStationsForFunctionalUnit(resStationTable, lsFU->fuType);
-    int nextResStation = (lsFU->lastSelectedResStation + 1) % numResStations;
-    LSFUResult *nextResult = NULL;
+    ResStationStatusTableEntry **loadResStationEntries = resStationEntriesForFunctionalUnit(resStationTable, FU_TYPE_LOAD);
+    ResStationStatusTableEntry **storeResStationEntries = resStationEntriesForFunctionalUnit(resStationTable, FU_TYPE_STORE);
+    int numLoadEntries = numResStationsForFunctionalUnit(resStationTable, FU_TYPE_LOAD);
+    int numStoreEntries = numResStationsForFunctionalUnit(resStationTable, FU_TYPE_STORE);
+    
+    enum FunctionalUnitType closestToHeadType = FU_TYPE_NONE;
+    int closestToHeadMinVal = robTable->NR;
+    int closestToHeadResStationIndex = -1;
 
-    // iterate over all reservation stations to find the next operands to operate on
-    for (int i = 0; i < numResStations; i++) {
-
-        // get the reservation station entry's destination ROB and use it to get the assocaited ROB entry
-        ResStationStatusTableEntry *resStationEntry = resStationEntries[nextResStation];
+    // iterate over load reservation stations
+    for (int i = 0; i < numLoadEntries; i++) {
+        
+        ResStationStatusTableEntry *resStationEntry = loadResStationEntries[i];
         int destROB = resStationEntry->dest;
         ROBStatusTableEntry *robEntry = robTable->entries[destROB];
 
         // do not allow instructions that just received a value from the CDB to execute in the same cycle
         if (resStationEntry->busy && resStationEntry->justGotOperandFromCDB) {
             resStationEntry->justGotOperandFromCDB = 0;
-            nextResStation = (nextResStation + 1) % numResStations;
             continue;
         }
 
-        // if both operands of the reservation station and the instruction's state is "issued" then it can be brought into the functional unit
+        // if both operands of the reservation station and the instruction's state is "issued" then it can possibly be brought into the functional unit
+        if (resStationEntry->busy && (resStationEntry->vkIsAvailable) && robEntry->state == INST_STATE_ISSUED) {
+
+            // check if it is the closest load/store instruction to the head of the rob
+            int distToHead = indexDistanceToROBHead(robTable, robEntry->index);
+
+            if (distToHead < closestToHeadMinVal) {
+                closestToHeadMinVal = distToHead;
+                closestToHeadResStationIndex = i;
+                closestToHeadType = FU_TYPE_LOAD;
+            }
+        }
+    }
+
+    // iterate over store reservation stations
+    for (int i = 0; i < numStoreEntries; i++) {
+        
+        ResStationStatusTableEntry *resStationEntry = storeResStationEntries[i];
+        int destROB = resStationEntry->dest;
+        ROBStatusTableEntry *robEntry = robTable->entries[destROB];
+
+        // do not allow instructions that just received a value from the CDB to execute in the same cycle
+        if (resStationEntry->busy && resStationEntry->justGotOperandFromCDB) {
+            resStationEntry->justGotOperandFromCDB = 0;
+            continue;
+        }
+
+        // if both operands of the reservation station and the instruction's state is "issued" then it can possibly be brought into the functional unit
         if (resStationEntry->busy && (resStationEntry->vjIsAvailable && resStationEntry->vkIsAvailable) && robEntry->state == INST_STATE_ISSUED) {
 
-            printf("selecting reservation station: INT[%d] for execution\n", resStationEntry->resStationIndex);
-            
-            lsFU->lastSelectedResStation = nextResStation;
+            // check if it is the closest load/store instruction to the head of the rob
+            int distToHead = indexDistanceToROBHead(robTable, robEntry->index);
 
-            // update entry in ROB to "executing"
-            robEntry->state = INST_STATE_EXECUTING;
-
-            // allocate and initialize the next result which will get passed through the stages of the functional unit
-            nextResult = malloc(sizeof(LSFUResult));
-            nextResult->source1 = resStationEntry->vjInt;
-            nextResult->source2 = resStationEntry->vkInt;
-            nextResult->destROB = destROB;
-
-            // perform the calculation for different possible operations
-            if (resStationEntry->op == FU_OP_ADD) {
-                nextResult->result = nextResult->source1 + nextResult->source2;
-            } else if (resStationEntry->op == FU_OP_SUB) {
-                nextResult->result = nextResult->source1 - nextResult->source2;
-            } else if (resStationEntry->op == FU_OP_SLT) {
-                nextResult->result = nextResult->source1 < nextResult->source2;
-            } else {
-                printf("error: tried to start executing an instruction in the INT functional unit with an invalid operation\n");
-                exit(1);
+            if (distToHead < closestToHeadMinVal) {
+                closestToHeadMinVal = distToHead;
+                closestToHeadResStationIndex = i;
+                closestToHeadType = FU_TYPE_STORE;
             }
-
-            break;
         }
-        
-        nextResStation = (nextResStation + 1) % numResStations;
     }
 
-    if (!nextResult) {
-        printf("no reservation station found to start executing\n");
+    // reservation station entry that will be brought into the functional unit
+    ResStationStatusTableEntry *resStationEntry = NULL;
+    
+    // check if a reservation station was found to start executing
+    if (closestToHeadType != FU_TYPE_NONE) {
+
+        if (closestToHeadType == FU_TYPE_LOAD) {
+            resStationEntry = loadResStationEntries[closestToHeadResStationIndex];
+        } else if (closestToHeadType == FU_TYPE_STORE) {
+            resStationEntry = storeResStationEntries[closestToHeadResStationIndex];
+        } else {
+            printf("error: invalid type for finding closest res station to ROB head in LS functional unit, this should never happen\n");
+            exit(1);
+        }
+    } else {
+        printf("no reservation station entries found for LOAD/STORE functional unit\n");
+        lsFU->stages[0] = NULL;
+        return;
     }
+
+    // ROB entry associated with the found reservation station
+    ROBStatusTableEntry *robEntry = robTable->entries[resStationEntry->dest];
+    robEntry->state = INST_STATE_EXECUTING;
+
+    // perform the address calculation
+    LSFUResult *nextResult = malloc(sizeof(LSFUResult));
+    nextResult->base = resStationEntry->vkInt;
+    nextResult->offset = resStationEntry->addr;
+    nextResult->resultAddr = nextResult->base + nextResult->offset;
+    nextResult->destROB = resStationEntry->dest;
+    nextResult->fuType = closestToHeadType;
+
 
     // move data through the stages of the functional unit by shifting elements of the stages array to the right
     // this does not do anything given the project design as the stages array is only one element, so it's commented out, but it's good to be general

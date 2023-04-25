@@ -16,6 +16,7 @@ typedef struct FunctionalUnits FunctionalUnits;
 typedef struct IntFunctionalUnit IntFunctionalUnit;
 typedef struct LabelTable LabelTable;
 typedef struct BranchPredictor BranchPredictor;
+typedef struct MemoryUnit MemoryUnit;
 
 // struct containing information about stall statistics
 typedef struct StallStats {
@@ -50,6 +51,8 @@ typedef struct CPU {
 
     BranchPredictor *branchPredictor;
 
+    MemoryUnit *memUnit;
+
 } CPU;
 
 void initCPU(CPU *cpu, Params *params);
@@ -58,7 +61,6 @@ void teardownCPU(CPU *cpu);
 void cycleFunctionalUnits(CPU *cpu);
 void printStallStats(StallStats *stallStats);
 void printStatusTables(CPU *cpu);
-void printInstructionFetchBuffer(CPU *cpu);
 int executionIsComplete(CPU *cpu);
 
 void executeCPU(CPU *cpu);

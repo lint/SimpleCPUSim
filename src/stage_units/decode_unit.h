@@ -8,6 +8,7 @@ typedef struct StallStats StallStats;
 typedef struct ArchRegister ArchRegister;
 typedef struct LabelTable LabelTable;
 typedef struct FetchBufferEntry FetchBufferEntry;
+typedef struct ROBStatusTable ROBStatusTable;
 
 // struct representing a node storing register information for the mapping table and free list
 typedef struct RegisterMappingNode {
@@ -25,9 +26,6 @@ typedef struct MapTableEntry {
 // struct representing a decode unit
 typedef struct DecodeUnit {
     Instruction **decodeQueue;
-    FetchBufferEntry **fetchBuffer;
-    int *fetchBufferSize;
-    int *numInstsInBuffer;
     int numInstsInQueue;
     int NI;
     int NW;
@@ -39,7 +37,7 @@ typedef struct DecodeUnit {
 } DecodeUnit;
 
 // decode unit methods
-void initDecodeUnit(DecodeUnit *decodeUnit, int NF, int NI, FetchBufferEntry **fetchBuffer, int *fetchBufferSize, int *numInstsInBuffer);
+void initDecodeUnit(DecodeUnit *decodeUnit, int NF, int NI);
 void teardownDecodeUnit(DecodeUnit *decodeUnit);
 // void extendDecodeUnitInputBufferIfNeeded(DecodeUnit *decodeUnit);
 // void setDecodeUnitInputBufferSize(DecodeUnit *decodeUnit, int newSize);
@@ -52,7 +50,7 @@ void printDecodeQueue(DecodeUnit *decodeUnit);
 //RegisterMappingNode *getFreePhysicalRegister(DecodeUnit *decodeUnit);
 RegisterMappingNode *getFreeRenameRegister(DecodeUnit *decodeUnit);
 RegisterMappingNode *getFreeListTailNode(DecodeUnit *decodeUnit);
-void popOldPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ArchRegister *reg, int addToTail);
+void popOldPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ROBStatusTable *robTable, ArchRegister *reg, int addToTail);
 void popNewPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ArchRegister *reg, int addToTail);
 //void addPhysicalRegisterToMapTable(DecodeUnit *decodeUnit, RegisterMappingNode *physRegNode, enum RegisterName reg);
 // void addRenameRegisterToIntMapTable(DecodeUnit *decodeUnit, RegisterMappingNode *renameRegNode, int reg); // reg = enum IntRegisterName
@@ -60,11 +58,11 @@ void popNewPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ArchRegister *r
 // enum PhysicalRegisterName readMapTable(DecodeUnit *decodeUnit, enum RegisterName reg);
 enum RenameRegisterName readIntMapTableForReg(DecodeUnit *decodeUnit, int reg); // reg = enum IntRegisterName
 enum RenameRegisterName readFloatMapTableForReg(DecodeUnit *decodeUnit, int reg); // reg = enum FloatRegisterName
-void performRegisterRenaming(DecodeUnit *decodeUnit, Instruction *inst);
-void cycleDecodeUnit(DecodeUnit *decodeUnit, StatusTables *statusTables, RegisterFile *regFile, StallStats *stallStats, LabelTable *labelTable);
+int performRegisterRenamingForInst(DecodeUnit *decodeUnit, Instruction *inst);
+void cycleDecodeUnit(DecodeUnit *decodeUnit, FetchBufferEntry **fetchBuffer, int *numInstsInBuffer, StatusTables *statusTables, RegisterFile *regFile, StallStats *stallStats, LabelTable *labelTable);
 
 int numFreeRenameRegistersAvailable(DecodeUnit *decodeUnit);
-void flushFetchBufferAndDecodeQueue(DecodeUnit *decodeUnit);
+void flushDecodeQueue(DecodeUnit *decodeUnit);
 
 
 

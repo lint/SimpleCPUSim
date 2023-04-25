@@ -37,6 +37,7 @@ typedef struct LSFUResult {
     int resultAddr;
     int destROB;
     int fuType; // either FU_TYPE_LOAD or FU_TYPE_STORE
+    float loadValue; // used in the memory unit
 } LSFUResult;
 
 // struct that bundles the functional units together 
@@ -46,5 +47,6 @@ typedef struct FunctionalUnits {
     FPFunctionalUnit *fpMulFU;
     FPFunctionalUnit *fpDivFU;
     BUFunctionalUnit *buFU;
+    LSFunctionalUnit *lsFU;
 
 } FunctionalUnits;

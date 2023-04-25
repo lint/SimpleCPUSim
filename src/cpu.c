@@ -56,18 +56,14 @@ void initCPU(CPU *cpu, Params *params) {
 
     /* initialize stage units */
 
-    // initialize instruction fetch buffer that is shared between fetch and decode units
-    FetchBufferEntry **fetchBuffer = calloc(params->NF, sizeof(FetchBufferEntry *));
-    int *fetchBufferSize = malloc(sizeof(int));
-    int *numInstsInFetchBuffer = malloc(sizeof(int));
-    *fetchBufferSize = params->NF;
-    *numInstsInFetchBuffer = 0;
-
     cpu->fetchUnit = malloc(sizeof(FetchUnit));
-    initFetchUnit(cpu->fetchUnit, params->NF, fetchBuffer, fetchBufferSize, numInstsInFetchBuffer);
+    initFetchUnit(cpu->fetchUnit, params->NF);
 
     cpu->decodeUnit = malloc(sizeof(DecodeUnit));
-    initDecodeUnit(cpu->decodeUnit, params->NI, params->NW, fetchBuffer, fetchBufferSize, numInstsInFetchBuffer);
+    initDecodeUnit(cpu->decodeUnit, params->NI, params->NW);
+
+    cpu->memUnit = malloc(sizeof(MemoryUnit));
+    initMemoryUnit(cpu->memUnit);
 
     cpu->writebackUnit = malloc(sizeof(WritebackUnit));
     initWritebackUnit(cpu->writebackUnit, params->NB, params->NR);
@@ -93,20 +89,17 @@ void initCPU(CPU *cpu, Params *params) {
     initFPFunctionalUnit(fpDivFU, FU_TYPE_FPDIV, 8); // latency decribed in project description
     fus->fpDivFU = fpDivFU;
 
-    printf("here un0\n");
-
     BUFunctionalUnit *buFU = malloc(sizeof(BUFunctionalUnit));
     initBUFunctionalUnit(buFU, 1); // latency described in project description
     fus->buFU = buFU;
 
-    printf("here dos\n");
-
+    LSFunctionalUnit *lsFU = malloc(sizeof(LSFunctionalUnit));
+    initLSFunctionalUnit(lsFU, 1);
+    fus->lsFU = lsFU;
+    
     // initialize branch predictor
-    BranchPredictor *branchPredictor = malloc(sizeof(BranchPredictor));
-    initBranchPredictor(branchPredictor);
-    cpu->branchPredictor = branchPredictor;
-
-    printf("here tres\n");
+    cpu->branchPredictor = malloc(sizeof(BranchPredictor));
+    initBranchPredictor(cpu->branchPredictor);
 }
 
 // free any elements of the CPU that were stored on the heap
@@ -136,10 +129,6 @@ void teardownCPU(CPU *cpu) {
         free(cpu->registerFile);
     }
 
-    if (cpu->fetchUnit->fetchBuffer) {
-        free(cpu->fetchUnit->fetchBuffer);
-    }
-
     if (cpu->fetchUnit) {
         teardownFetchUnit(cpu->fetchUnit);
         free(cpu->fetchUnit);
@@ -153,6 +142,11 @@ void teardownCPU(CPU *cpu) {
     if (cpu->writebackUnit) {
         teardownWritebackUnit(cpu->writebackUnit);
         free(cpu->writebackUnit);
+    }
+
+    if (cpu->memUnit) {
+        teardownMemoryUnit(cpu->memUnit);
+        free(cpu->memUnit);
     }
 
     if (cpu->functionalUnits) {
@@ -171,6 +165,10 @@ void teardownCPU(CPU *cpu) {
         if (cpu->functionalUnits->fpDivFU) {
             teardownFPFunctionalUnit(cpu->functionalUnits->fpDivFU);
             free(cpu->functionalUnits->fpDivFU);
+        }
+        if (cpu->functionalUnits->lsFU) {
+            teardownLSFunctionalUnit(cpu->functionalUnits->lsFU);
+            free(cpu->functionalUnits->lsFU);
         }
 
         free(cpu->functionalUnits);
@@ -199,19 +197,6 @@ void teardownCPU(CPU *cpu) {
         teardownBranchPredictor(cpu->branchPredictor);
         free(cpu->branchPredictor);
     }
-}
-
-// helper method to print the contents of the instruction fetch buffer
-void printInstructionFetchBuffer(CPU *cpu) {
-
-    FetchUnit *fetchUnit = cpu->fetchUnit;
-    printf("instruction fetch buffer: %p, size: %i, numInsts: %i, items: ", fetchUnit->fetchBuffer, *fetchUnit->fetchBufferSize, *fetchUnit->numInstsInBuffer);
-    
-    for (int i = 0; i < *fetchUnit->numInstsInBuffer; i++) {
-        printf("%p, ", fetchUnit->fetchBuffer[i]);
-    }
-
-    printf("\n");
 }
 
 // helper method to print the contents of the all status tables
@@ -246,6 +231,9 @@ void cycleFunctionalUnits(CPU *cpu) {
 
     cycleBUFunctionalUnit(cpu->functionalUnits->buFU, cpu->statusTables);
     printBUFunctionalUnit(cpu->functionalUnits->buFU);
+
+    cycleLSFunctionalUnit(cpu->functionalUnits->lsFU, cpu->statusTables);
+    printLSFunctionalUnit(cpu->functionalUnits->lsFU);
 }
 
 // checks to see if the ROB status table is empty, indicating that the program has finished execution
@@ -255,7 +243,7 @@ int executionIsComplete(CPU *cpu) {
     if (cpu->cycle <= 2) {
         return 0;
     // emergency cut off if cpu has reached one billion cycles 1000000000
-    } else if (cpu->cycle >= 1000000000) {
+    } else if (cpu->cycle >= 10000) {
         return 1;
     }
     
@@ -281,27 +269,33 @@ void executeCPU(CPU *cpu) {
         printf("\n----------------------------------------------------------------------------------------------------------------------------------------------------------------\n");
         printf("\ncycle: %i\n", cpu->cycle);
 
-        cycleWritebackUnit(cpu->writebackUnit, cpu->decodeUnit, cpu->statusTables, cpu->functionalUnits, cpu->registerFile, cpu->branchPredictor);
+        cycleWritebackUnit(cpu->writebackUnit, cpu->fetchUnit, cpu->decodeUnit, cpu->memUnit, cpu->statusTables, cpu->functionalUnits, cpu->registerFile, cpu->dataCache, cpu->branchPredictor);
         printWritebackUnitCDBS(cpu->writebackUnit);
         printStatusTables(cpu);
+
+        cycleMemoryUnit(cpu->memUnit, cpu->dataCache, cpu->functionalUnits->lsFU, cpu->statusTables);
+        printMemoryUnit(cpu->memUnit);
 
         cycleFunctionalUnits(cpu);
 
         //cycleIssueUnit(cpu->issueUnit, cpu->statusTables, cpu->registerFile, cpu->stallStats);
         printStatusTables(cpu);
 
-        cycleDecodeUnit(cpu->decodeUnit, cpu->statusTables, cpu->registerFile, cpu->stallStats, cpu->labelTable);
+        cycleDecodeUnit(cpu->decodeUnit, cpu->fetchUnit->fetchBuffer, cpu->fetchUnit->numInstsInBuffer, cpu->statusTables, cpu->registerFile, cpu->stallStats, cpu->labelTable);
         printFreeList(cpu->decodeUnit);
         printMapTable(cpu->decodeUnit);
         printDecodeQueue(cpu->decodeUnit);
-        printInstructionFetchBuffer(cpu);
+        printInstructionFetchBuffer(cpu->fetchUnit);
         printStatusTables(cpu);
 
         cycleFetchUnit(cpu->fetchUnit, cpu->registerFile, cpu->instCache, cpu->branchPredictor);
-        printInstructionFetchBuffer(cpu);
+        printInstructionFetchBuffer(cpu->fetchUnit);
         
         printBranchPredictor(cpu->branchPredictor);
         // break;
+
+        printRegisterFile(cpu->registerFile);
+        printMapTable(cpu->decodeUnit);
         cpu->cycle++;
     }
 

@@ -182,7 +182,7 @@ int numResStationsForFunctionalUnit(ResStationStatusTable *resStationTable, int 
         return resStationTable->numIntStations;
     } else if (fuType == FU_TYPE_LOAD) {
         return resStationTable->numLoadStations;
-    } else if (fuType == FU_TYPE_LOAD) {
+    } else if (fuType == FU_TYPE_STORE) {
         return resStationTable->numStoreStations;
     } else if (fuType == FU_TYPE_FPADD) {
         return resStationTable->numFPAddStations;
@@ -204,7 +204,7 @@ ResStationStatusTableEntry **resStationEntriesForFunctionalUnit(ResStationStatus
         return resStationTable->intEntries;
     } else if (fuType == FU_TYPE_LOAD) {
         return resStationTable->loadEntries;
-    } else if (fuType == FU_TYPE_LOAD) {
+    } else if (fuType == FU_TYPE_STORE) {
         return resStationTable->storeEntries;
     } else if (fuType == FU_TYPE_FPADD) {
         return resStationTable->fpAddEntries;
@@ -425,10 +425,15 @@ void addInstToResStation(ResStationStatusTable *resStationTable, RegisterStatusT
     // add instructions that need the load functional unit to the reservation station
     } else if (instType == FLD) {
 
-        // setResStationEntryOperandAvailability(entry, regTable, regFile, )
+        entry->addr = inst->imm;
+        setResStationEntryOperandAvailability(entry, regTable, regFile, 2, inst->source2Reg, inst->source2PhysReg, VALUE_TYPE_INT);
 
     // add instructions that need the store functional unit to the reservation station
     } else if (instType == FSD) {
+
+        entry->addr = inst->imm;
+        setResStationEntryOperandAvailability(entry, regTable, regFile, 1, inst->source1Reg, inst->source1PhysReg, VALUE_TYPE_FLOAT);
+        setResStationEntryOperandAvailability(entry, regTable, regFile, 2, inst->source2Reg, inst->source2PhysReg, VALUE_TYPE_INT);
     
     // add instructions that need the BU functional unit to the reservation station
     } else if (instType == BNE) {

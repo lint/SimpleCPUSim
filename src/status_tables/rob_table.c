@@ -94,6 +94,7 @@ int addInstToROB(ROBStatusTable *robTable, Instruction *inst) {
         } else if (instType == FLD) {
             entry->fuType = FU_TYPE_LOAD;
         } else if (instType == FSD) {
+            entry->instResultValueType = VALUE_TYPE_NONE;
             entry->fuType = FU_TYPE_STORE;
         } else if (instType == FMUL) {
             entry->fuType = FU_TYPE_FPMUL;
@@ -125,7 +126,7 @@ void printROBStatusTable(ROBStatusTable *robTable) {
         }
         printf("\trobIndex: %i, busy: %i, inst: %s, dest: %s, renamedDest: %s, intVal: %i, floatVal: %f, ", entry->index, entry->busy, entry->inst ? entry->inst->fullStr : "null", destStr, 
             physicalRegisterNameToString(entry->renamedDestReg), entry->intValue, entry->floatValue);
-        printf("state: %s, resultType: %s, flushed: %i\n", instStateToString(entry->state), valueTypeToString(entry->instResultValueType), entry->flushed);
+        printf("state: %s, resultType: %s, flushed: %i, addr: %i\n", instStateToString(entry->state), valueTypeToString(entry->instResultValueType), entry->flushed, entry->addr);
     }
 }
 
@@ -167,4 +168,36 @@ void flushROB(ROBStatusTable *robTable) {
         // robTable->entries[i]->busy = 0;
         // TODO: clean up
     }
+}
+
+// helper method that returns how many entries away the given ROB index is from the head 
+int indexDistanceToROBHead(ROBStatusTable *robTable, int index) {
+
+    int headIndex = robTable->headEntryIndex;
+
+    if (index > headIndex) {
+        return index - headIndex;
+    } else if (index < headIndex) {
+        return robTable->NR - (headIndex - index);
+    } else {
+        return 0;
+    }
+}
+
+// determines if there is a ROB that will write to a given physical register
+int physicalRegWillBeWrittenBySomeROB(ROBStatusTable *robTable, enum PhysicalRegisterName reg) {
+
+    if (reg == PHYS_REG_ZERO || reg == PHYS_REG_NONE || reg >= PHYS_REG_SIZE) {
+        return 0;
+    }
+
+    for (int i = 0; i < robTable->NR; i++) {
+        ROBStatusTableEntry *entry = robTable->entries[i];
+
+        if (entry->busy && entry->renamedDestReg == reg) {
+            return 1;
+        }
+    }
+
+    return 0;
 }

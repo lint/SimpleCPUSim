@@ -40,3 +40,5 @@ void printROBStatusTable(ROBStatusTable *robTable);
 ROBStatusTableEntry *getHeadROBEntry(ROBStatusTable *robTable);
 int isROBEmpty(ROBStatusTable *robTable);
 void flushROB(ROBStatusTable *robTable);
+int indexDistanceToROBHead(ROBStatusTable *robTable, int index);
+int physicalRegWillBeWrittenBySomeROB(ROBStatusTable *robTable, int reg); // reg = enum PhysicalRegisterName

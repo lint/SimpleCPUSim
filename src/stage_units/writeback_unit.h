@@ -5,6 +5,9 @@ typedef struct StatusTables StatusTables;
 typedef struct FunctionalUnits FunctionalUnits;
 typedef struct DecodeUnit DecodeUnit;
 typedef struct BranchPredictor BranchPredictor;
+typedef struct MemoryUnit MemoryUnit;
+typedef struct DataCache DataCache;
+typedef struct FetchUnit FetchUnit;
 
 // struct representing a common data bus
 typedef struct CDB {
@@ -16,7 +19,7 @@ typedef struct CDB {
     int producedBy;
     int producingFUType;
     int buTookBranch;
-    int buAddr;
+    int addr;
 } CDB;
 
 // struct containing information about each ROB entry to make decisions about what values to place on the CDB
@@ -29,6 +32,7 @@ typedef struct ROBWBInfo {
     int producedBy; // enum ValProducedBy
     int producingFUType; // enum FunctionalUnitType
     int valueType; // enum InstructionResultValueType
+    int addr;
 
 } ROBWBInfo;
 
@@ -48,7 +52,7 @@ void initWritebackUnit(WritebackUnit *writebackUnit, int NB, int NR);
 void teardownWritebackUnit(WritebackUnit *writebackUnit);
 void resetWritebackUnitROBWBInfo(WritebackUnit *writebackUnit);
 void updateWritebackUnitWaitingForROB(WritebackUnit *writebackUnit, ResStationStatusTableEntry **resStationEntries, int numEntries);
-void cycleWritebackUnit(WritebackUnit *writebackUnit, DecodeUnit *decodeUnit, StatusTables *statusTables, 
-    FunctionalUnits *functionalUnits, RegisterFile *registerFile, BranchPredictor *branchPredictor);
+void cycleWritebackUnit(WritebackUnit *writebackUnit, FetchUnit *fetchUnit, DecodeUnit *decodeUnit, MemoryUnit *memUnit, StatusTables *statusTables, 
+    FunctionalUnits *functionalUnits, RegisterFile *registerFile, DataCache *dataCache, BranchPredictor *branchPredictor);
 void printWritebackUnitROBInfo(WritebackUnit *writebackUnit);
 void printWritebackUnitCDBS(WritebackUnit *writebackUnit);

@@ -21,4 +21,4 @@ void printRegisterStatusTable(RegisterStatusTable *regTable);
 void setRegisterStatusTableEntryROBIndex(RegisterStatusTable *regTable, ArchRegister *reg, int robIndex);
 int getRegisterStatusTableEntryROBIndex(RegisterStatusTable *regTable, ArchRegister *reg);
 RegisterStatusTableEntry *registerStatusTableEntryForReg(RegisterStatusTable *regTable, ArchRegister *reg);
-void resetRegisterStatusTable(RegisterStatusTable *regTable);
+void flushRegisterStatusTable(RegisterStatusTable *regTable);

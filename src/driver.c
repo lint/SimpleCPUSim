@@ -168,7 +168,11 @@ void processInput(char *inputFn, CPU *cpu) {
                 addEntryToLabelTable(cpu->labelTable, numInsts * 4, label);
             }
 
-            // TODO: remove this? printInstruction(inst);
+            if (!strcmp(instStr, "")) {
+                printf("error: tried to process instruction that was empty, not reading any more instructions\n");
+                readError = 1;
+                break;
+            }
 
             // add the parsed instruction to the cache
             addInstructionToCache(cpu->instCache, instStr);
@@ -197,6 +201,8 @@ int main(int argc, char *argv[]) {
     // process config file
     Params params;
     readConfig(argv[1], &params);
+    // exit(1);
+    // TODO: remove this...
 
     // create new CPU struct and initialize it
     CPU cpu;

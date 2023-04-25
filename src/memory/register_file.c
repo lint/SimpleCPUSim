@@ -143,7 +143,7 @@ void printRegisterFile(RegisterFile *registerFile) {
         if (entry->valueType == VALUE_TYPE_INT) {
             printf("\t%s: %i\n", physicalRegisterNameToString(i), entry->intVal);
         } else if (entry->valueType == VALUE_TYPE_FLOAT) {
-            printf("\t%s: %f\n", physicalRegisterNameToString(i), entry->floatVal);
+            printf("\t%s: %.1f\n", physicalRegisterNameToString(i), entry->floatVal);
         } else {
             printf("\t%s: 0 (never used)\n", physicalRegisterNameToString(i));
         }
