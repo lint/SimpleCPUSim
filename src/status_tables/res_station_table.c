@@ -27,6 +27,7 @@ ResStationStatusTableEntry *newResStationStatusTableEntry() {
     entry->qk = -1;
     entry->dest = -1;
     entry->addr = -1;
+    entry->buOffset = 0;
 
     return entry;
 }
@@ -424,12 +425,19 @@ void addInstToResStation(ResStationStatusTable *resStationTable, RegisterStatusT
     // add instructions that need the load functional unit to the reservation station
     } else if (instType == FLD) {
 
+        // setResStationEntryOperandAvailability(entry, regTable, regFile, )
+
     // add instructions that need the store functional unit to the reservation station
     } else if (instType == FSD) {
     
     // add instructions that need the BU functional unit to the reservation station
     } else if (instType == BNE) {
 
+        entry->buOffset = inst->imm;
+        entry->addr = inst->addr;
+
+        setResStationEntryOperandAvailability(entry, regTable, regFile, 1, inst->source1Reg, inst->source1PhysReg, VALUE_TYPE_INT);
+        setResStationEntryOperandAvailability(entry, regTable, regFile, 2, inst->source2Reg, inst->source2PhysReg, VALUE_TYPE_INT);
     }
 
     // TODO
@@ -529,5 +537,107 @@ void printResStationStatusTable(ResStationStatusTable *resStationTable) {
         printf("\tindex: %i, busy: %i, op: %s, vjInt: %i, vkInt: %i, vjIsAvail: %i, vkIsAvail: %i, qj: %i, qk: %i, destROB: %i\n", 
             entry->resStationIndex, entry->busy, fuOpToString(entry->op), entry->vjInt, entry->vkInt,
             entry->vjIsAvailable, entry->vkIsAvailable, entry->qj, entry->qk, entry->dest);
+    }
+
+    printf("FPAdd FU reservation stations:\n");
+    for (int i = 0; i < resStationTable->numFPAddStations; i++) {
+        ResStationStatusTableEntry *entry = resStationTable->fpAddEntries[i];
+        
+        printf("\tindex: %i, busy: %i, op: %s, vjFloat: %f, vkFloat: %f, vjIsAvail: %i, vkIsAvail: %i, qj: %i, qk: %i, destROB: %i\n", 
+            entry->resStationIndex, entry->busy, fuOpToString(entry->op), entry->vjFloat, entry->vkFloat,
+            entry->vjIsAvailable, entry->vkIsAvailable, entry->qj, entry->qk, entry->dest);
+    }
+
+    printf("FPMul FU reservation stations:\n");
+    for (int i = 0; i < resStationTable->numFPMulStations; i++) {
+        ResStationStatusTableEntry *entry = resStationTable->fpMulEntries[i];
+        
+        printf("\tindex: %i, busy: %i, op: %s, vjFloat: %f, vkFloat: %f, vjIsAvail: %i, vkIsAvail: %i, qj: %i, qk: %i, destROB: %i\n", 
+            entry->resStationIndex, entry->busy, fuOpToString(entry->op), entry->vjFloat, entry->vkFloat,
+            entry->vjIsAvailable, entry->vkIsAvailable, entry->qj, entry->qk, entry->dest);
+    }
+
+    printf("FPDiv FU reservation stations:\n");
+    for (int i = 0; i < resStationTable->numFPDivStations; i++) {
+        ResStationStatusTableEntry *entry = resStationTable->fpDivEntries[i];
+        
+        printf("\tindex: %i, busy: %i, op: %s, vjFloat: %f, vkFloat: %f, vjIsAvail: %i, vkIsAvail: %i, qj: %i, qk: %i, destROB: %i\n", 
+            entry->resStationIndex, entry->busy, fuOpToString(entry->op), entry->vjFloat, entry->vkFloat,
+            entry->vjIsAvailable, entry->vkIsAvailable, entry->qj, entry->qk, entry->dest);
+    }
+
+    printf("BU FU reservation stations:\n");
+    for (int i = 0; i < resStationTable->numBUStations; i++) {
+        ResStationStatusTableEntry *entry = resStationTable->buEntries[i];
+        
+        printf("\tindex: %i, busy: %i, op: %s, vjInt: %i, vkInt: %i, vjIsAvail: %i, vkIsAvail: %i, qj: %i, qk: %i, destROB: %i\n", 
+            entry->resStationIndex, entry->busy, fuOpToString(entry->op), entry->vjInt, entry->vkInt,
+            entry->vjIsAvailable, entry->vkIsAvailable, entry->qj, entry->qk, entry->dest);
+    }
+
+    printf("load FU reservation stations:\n");
+    for (int i = 0; i < resStationTable->numLoadStations; i++) {
+        ResStationStatusTableEntry *entry = resStationTable->loadEntries[i];
+        
+        printf("\tindex: %i, busy: %i, op: %s, vjFloat: %f, vkFloat: %f, vjIsAvail: %i, vkIsAvail: %i, qj: %i, qk: %i, destROB: %i\n", 
+            entry->resStationIndex, entry->busy, fuOpToString(entry->op), entry->vjFloat, entry->vkFloat,
+            entry->vjIsAvailable, entry->vkIsAvailable, entry->qj, entry->qk, entry->dest);
+    }
+
+    printf("store FU reservation stations:\n");
+    for (int i = 0; i < resStationTable->numStoreStations; i++) {
+        ResStationStatusTableEntry *entry = resStationTable->storeEntries[i];
+        
+        printf("\tindex: %i, busy: %i, op: %s, vjFloat: %f, vkFloat: %f, vjIsAvail: %i, vkIsAvail: %i, qj: %i, qk: %i, destROB: %i\n", 
+            entry->resStationIndex, entry->busy, fuOpToString(entry->op), entry->vjFloat, entry->vkFloat,
+            entry->vjIsAvailable, entry->vkIsAvailable, entry->qj, entry->qk, entry->dest);
+    }
+}
+
+// sets all reservation stations to not busy
+void flushResStationStatusTable(ResStationStatusTable *resStationTable) {
+    
+    printf("flushing reservation station status table:\n");
+
+    // clear int functional unit reservation stations
+    for (int i = 0; i < resStationTable->numIntStations; i++) {
+        ResStationStatusTableEntry *entry = resStationTable->intEntries[i];
+        entry->busy = 0;    
+    }
+
+    // clear fpadd functional unit reservation stations
+    for (int i = 0; i < resStationTable->numFPAddStations; i++) {
+        ResStationStatusTableEntry *entry = resStationTable->fpAddEntries[i];
+        entry->busy = 0;
+    }
+
+    // clear fpmul functional unit reservation stations
+    for (int i = 0; i < resStationTable->numFPMulStations; i++) {
+        ResStationStatusTableEntry *entry = resStationTable->fpMulEntries[i];
+        entry->busy = 0;
+    }
+
+    // clear fpdiv functional unit reservation stations
+    for (int i = 0; i < resStationTable->numFPDivStations; i++) {
+        ResStationStatusTableEntry *entry = resStationTable->fpDivEntries[i];
+        entry->busy = 0;
+    }
+
+    // clear BU functional unit reservation stations
+    for (int i = 0; i < resStationTable->numBUStations; i++) {
+        ResStationStatusTableEntry *entry = resStationTable->buEntries[i];
+        entry->busy = 0;
+    }
+
+    // clear load functional unit reservation stations
+    for (int i = 0; i < resStationTable->numLoadStations; i++) {
+        ResStationStatusTableEntry *entry = resStationTable->loadEntries[i];
+        entry->busy = 0;        
+    }
+
+    // clear store functional unit reservation stations
+    for (int i = 0; i < resStationTable->numStoreStations; i++) {
+        ResStationStatusTableEntry *entry = resStationTable->storeEntries[i];
+        entry->busy = 0;
     }
 }

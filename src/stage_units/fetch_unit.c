@@ -6,15 +6,16 @@
 #include "../cpu.h"
 #include "../memory/memory.h"
 #include "../misc/misc.h"
+#include "../branch_prediction/branch_predictor.h"
 
 // initialize the fetch unit struct
-void initFetchUnit(FetchUnit *fetchUnit, int NF, Instruction **instFetchBuffer, int *instFetchBufferSize, int *numInstsInBuffer) {
+void initFetchUnit(FetchUnit *fetchUnit, int NF, FetchBufferEntry **fetchBuffer, int *fetchBufferSize, int *numInstsInBuffer) {
 
     printf("initializing fetch unit...\n");
 
     fetchUnit->NF = NF;
-    fetchUnit->instFetchBuffer = instFetchBuffer;
-    fetchUnit->instFetchBufferSize = instFetchBufferSize;
+    fetchUnit->fetchBuffer = fetchBuffer;
+    fetchUnit->fetchBufferSize = fetchBufferSize;
     fetchUnit->numInstsInBuffer = numInstsInBuffer;
 }
 
@@ -27,19 +28,19 @@ void teardownFetchUnit(FetchUnit *fetchUnit) {
 void extendFetchUnitOutputBufferIfNeeded(FetchUnit *fetchUnit) {
 
     // only extend the buffer if it is full
-    if (*fetchUnit->numInstsInBuffer == *fetchUnit->instFetchBufferSize) {
+    if (*fetchUnit->numInstsInBuffer == *fetchUnit->fetchBufferSize) {
 
         // get old values
-        Instruction **oldBuffer = fetchUnit->instFetchBuffer;
-        int oldSize = *fetchUnit->instFetchBufferSize;
+        FetchBufferEntry **oldBuffer = fetchUnit->fetchBuffer;
+        int oldSize = *fetchUnit->fetchBufferSize;
         int newSize = oldSize * 2;
 
         // reallocate array and copy contents
-        *fetchUnit->instFetchBufferSize = newSize;
-        fetchUnit->instFetchBuffer = realloc(fetchUnit->instFetchBuffer, newSize * sizeof(Instruction *));
+        *fetchUnit->fetchBufferSize = newSize;
+        fetchUnit->fetchBuffer = realloc(fetchUnit->fetchBuffer, newSize * sizeof(FetchBufferEntry *));
 
         for (int i = *fetchUnit->numInstsInBuffer; i < newSize; i++) {
-            fetchUnit->instFetchBuffer[i] = NULL;
+            fetchUnit->fetchBuffer[i] = NULL;
         }
 
         printf("extending fetch unit output buffer to %i entries\n", newSize);
@@ -47,16 +48,20 @@ void extendFetchUnitOutputBufferIfNeeded(FetchUnit *fetchUnit) {
 }
 
 // adds a fetched instruction to the output buffer
-void addInstToFetchUnitOutputBuffer(FetchUnit *fetchUnit, Instruction *inst) {
+void addInstToFetchUnitOutputBuffer(FetchUnit *fetchUnit, char *instStr, int instAddr) {
     extendFetchUnitOutputBufferIfNeeded(fetchUnit);
 
-    fetchUnit->instFetchBuffer[(*fetchUnit->numInstsInBuffer)++] = inst;
+    FetchBufferEntry *entry = malloc(sizeof(FetchBufferEntry));
+    entry->instAddr = instAddr;
+    entry->instStr = instStr;
 
-    printf("added instruction: %p to fetch buffer, numInstsInBuffer: %i\n", inst, *fetchUnit->numInstsInBuffer);
+    fetchUnit->fetchBuffer[(*fetchUnit->numInstsInBuffer)++] = entry;
+
+    printf("added instruction: '%s' addr: '%i' to fetch buffer, numInstsInBuffer: %i\n", instStr, instAddr, *fetchUnit->numInstsInBuffer);
 }
 
 // execute fetch unit's operations during a clock cycle
-void cycleFetchUnit(FetchUnit *fetchUnit, RegisterFile *registerFile, InstCache *instCache) {
+void cycleFetchUnit(FetchUnit *fetchUnit, RegisterFile *registerFile, InstCache *instCache, BranchPredictor *branchPredictor) {
 
     printf("\nperforming fetch unit operations...\n");
 
@@ -67,16 +72,17 @@ void cycleFetchUnit(FetchUnit *fetchUnit, RegisterFile *registerFile, InstCache 
     for (int i = 0; i < fetchUnit->NF; i++) {
 
         // get the instruction from the instruction cache
-        Instruction *inst = readInstructionCache(instCache, pcVal);
-        if (!inst) {
+        char *instStr = readInstructionCache(instCache, pcVal);
+        if (!instStr) {
             printf("could not get instruction from cache\n");
             break;
         }
 
         // write the instruction to the buffer
-        addInstToFetchUnitOutputBuffer(fetchUnit, inst);
+        addInstToFetchUnitOutputBuffer(fetchUnit, instStr, pcVal);
 
-        pcVal += 4;
+        // pcVal += 4;
+        pcVal = predictNextPC(branchPredictor, pcVal);
     }
     
     // update the new value of PC in the register file

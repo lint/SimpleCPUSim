@@ -28,7 +28,7 @@ RegisterStatusTableEntry *registerStatusTableEntryForReg(RegisterStatusTable *re
 
     RegisterStatusTableEntry *curr = regTable->headEntry;
 
-    if (!curr) {
+    if (!curr || !reg) {
         return NULL;
     }
 
@@ -62,6 +62,11 @@ int getRegisterStatusTableEntryROBIndex(RegisterStatusTable *regTable, ArchRegis
 void setRegisterStatusTableEntryROBIndex(RegisterStatusTable *regTable, ArchRegister *reg, int robIndex) {
     printf("set register status table int entry: %s to ROB index: %i\n", reg->name, robIndex);
 
+    if (!reg) {
+        printf("\tdestination register is null, not setting register status table entry\n");
+        return;
+    }
+
     RegisterStatusTableEntry *entry = registerStatusTableEntryForReg(regTable, reg);
 
     // check if the entry exists, and create a new entry if not
@@ -91,5 +96,17 @@ void printRegisterStatusTable(RegisterStatusTable *regTable) {
         }
     } else {
         printf("\tregister status table has no entries\n");
+    }
+}
+
+// clears all the entries in the register status table
+void resetRegisterStatusTable(RegisterStatusTable *regTable) {
+    printf("clearing register status table\n");
+
+    RegisterStatusTableEntry *curr = regTable->headEntry;
+
+    while (curr) {
+        curr->robIndex = -1;
+        curr = curr->next;
     }
 }

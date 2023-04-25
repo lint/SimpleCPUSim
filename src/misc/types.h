@@ -16,12 +16,6 @@ typedef struct ArchRegister {
     int regType; // enum ArchRegisterType
 } ArchRegister;
 
-// struct representing a node storing register information for the mapping table and free list
-typedef struct RegisterMappingNode {
-    int reg; // enum PhysicalRegisterName
-    struct RegisterMappingNode *next;
-} RegisterMappingNode;
-
 // struct representing an instruction
 typedef struct Instruction {
     int type; // enum InstructionType
@@ -33,14 +27,15 @@ typedef struct Instruction {
     int destPhysReg; // enum PhysicalRegisterName
     int regsWereRenamed;
     int imm; // either the offset used in load/store instructions or an immediate for addi instructions
-    int branchTargetAddr;
+    int branchTargetAddr; // TODO: remove this?
     char branchTargetLabel[256];
     char label[256];
     int addr; // address in the instruction cache
+    char fullStr[256];
 } Instruction;
 
 // helper methods
-enum InstructionType stringToInstructionType(char *s);
+int stringToInstructionType(char *s);
 char *physicalRegisterNameToString(int reg); // reg = enum PhysicalRegisterName
 void printInstruction(Instruction inst);
 char *instStateToString(int state); // state = enum InstructionState
@@ -48,5 +43,6 @@ char *valueTypeToString(int type); // type = enum ValueType
 char *fuOpToString(int op); // op = enum FunctionalUnitOperations
 char *fuTypeToString(int fuType); // fuType = enum FunctionalUnitType 
 char *valueProducedByToString(int producedBy); // producedBy = enum ValueProducedBy
+char *branchPredictionStateToString(int state); // state = enum BranchPredictionState
 ArchRegister *stringToArchRegister(char *s);
 int archRegistersAreEqual(ArchRegister *reg1, ArchRegister *reg2);

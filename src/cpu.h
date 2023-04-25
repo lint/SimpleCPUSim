@@ -14,6 +14,8 @@ typedef struct RegisterStatusTable RegisterStatusTable;
 typedef struct ResStationStatusTable ResStationStatusTable;
 typedef struct FunctionalUnits FunctionalUnits;
 typedef struct IntFunctionalUnit IntFunctionalUnit;
+typedef struct LabelTable LabelTable;
+typedef struct BranchPredictor BranchPredictor;
 
 // struct containing information about stall statistics
 typedef struct StallStats {
@@ -32,6 +34,8 @@ typedef struct CPU {
     Params *params;
     StallStats *stallStats;
 
+    LabelTable *labelTable;
+
     InstCache *instCache;
     DataCache *dataCache;
     RegisterFile *registerFile;
@@ -43,6 +47,8 @@ typedef struct CPU {
 
     FunctionalUnits *functionalUnits;
     StatusTables *statusTables;
+
+    BranchPredictor *branchPredictor;
 
 } CPU;
 

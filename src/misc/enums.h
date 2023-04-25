@@ -68,9 +68,18 @@ enum FunctionalUnitOperations {
 
 // enum represneting the different states that an instruction can be in
 enum InstructionState {
-    STATE_NONE = -1,
-    STATE_ISSUED,
-    STATE_EXECUTING,
-    STATE_WROTE_RESULT,
-    STATE_COMMIT
+    INST_STATE_NONE = -1,
+    INST_STATE_ISSUED,
+    INST_STATE_EXECUTING,
+    INST_STATE_WROTE_RESULT,
+    INST_STATE_COMMIT
+};
+
+// enum representing the different states that a branch predictor can be in
+enum BranchPredictionState {
+    BRANCH_STATE_NONE = -1,
+    BRANCH_STATE_STRONGLY_TAKEN,
+    BRANCH_STATE_WEAKLY_TAKEN,
+    BRANCH_STATE_WEAKLY_NOT_TAKEN,
+    BRANCH_STATE_STRONGLY_NOT_TAKEN,
 };

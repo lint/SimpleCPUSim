@@ -5,7 +5,7 @@ typedef struct Instruction Instruction; // forward declaration
 
 // struct representing an instruction cache
 typedef struct InstCache {
-    Instruction *cache;
+    char **cache;
     int cacheSize;
     int numInsts;
 } InstCache;
@@ -14,6 +14,6 @@ typedef struct InstCache {
 void initInstCache(InstCache *instCache);
 void teardownInstCache(InstCache *instCache);
 void extendInstCacheIfNeeded(InstCache *instCache);
-Instruction *readInstructionCache(InstCache *instCache, int address);
-void addInstructionToCache(InstCache *instCache, Instruction inst);
+char *readInstructionCache(InstCache *instCache, int address);
+void addInstructionToCache(InstCache *instCache, char *instStr);
 int resolveInstLabels(InstCache *instCache);

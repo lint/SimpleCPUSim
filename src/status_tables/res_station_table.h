@@ -22,7 +22,8 @@ typedef struct ResStationStatusTableEntry {
     int qj; // ROB index containing source operand 1
     int qk; // ROB index containing source operand 2
     int dest; // the ROB index that will hold the result
-    int addr; // the stored effective address (used with loads/stores)
+    int addr; // store address information for loads/stores/branches
+    int buOffset; // the offset stored in the BU instruction in order to calculate the effective address
 
 } ResStationStatusTableEntry;
 
@@ -67,3 +68,4 @@ void processIntUpdateForResStationEntries(ResStationStatusTableEntry **entries, 
 void processFloatUpdateForResStationEntries(ResStationStatusTableEntry **entries, int numEntries, int destROB, float result, int fromCDB);
 void sendIntUpdateToResStationStatusTable(ResStationStatusTable *resStationTable, int destROB, int result, int fromCDB);
 void sendFloatUpdateToResStationStatusTable(ResStationStatusTable *resStationTable, int destROB, float result, int fromCDB);
+void flushResStationStatusTable(ResStationStatusTable *resStationTable);

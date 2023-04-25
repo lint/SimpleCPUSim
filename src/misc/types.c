@@ -68,6 +68,10 @@ char *physicalRegisterNameToString(enum PhysicalRegisterName reg) {
 
     if (reg < 0) {
         return "NONE";
+    } else if (reg == PHYS_REG_PC) {
+        return "PHYS_PC";
+    } else if (reg == PHYS_REG_ZERO) {
+        return "PHYS_ZERO";
     }
 
     char *str = malloc(4 * sizeof(char));
@@ -78,13 +82,13 @@ char *physicalRegisterNameToString(enum PhysicalRegisterName reg) {
 
 // converts the instruction state enum to a string
 char *instStateToString(enum InstructionState state) {
-    if (state == STATE_ISSUED) {
+    if (state == INST_STATE_ISSUED) {
         return "ISSUED";
-    } else if (state == STATE_EXECUTING) {
+    } else if (state == INST_STATE_EXECUTING) {
         return "EXECUTING";
-    } else if (state == STATE_WROTE_RESULT) {
+    } else if (state == INST_STATE_WROTE_RESULT) {
         return "WROTE_RESULT";
-    } else if (state == STATE_COMMIT) {
+    } else if (state == INST_STATE_COMMIT) {
         return "COMMIT";
     } else {
         return "NONE";
@@ -147,14 +151,29 @@ char *valueProducedByToString(enum ValueProducedBy producedBy) {
     }
 }
 
+// converts the branch predictor state to string
+char *branchPredictionStateToString(enum BranchPredictionState state) {
+    if (state == BRANCH_STATE_STRONGLY_NOT_TAKEN) {
+        return "STRONGLY_NOT_TAKEN";
+    } else if (state == BRANCH_STATE_STRONGLY_TAKEN) {
+        return "STRONGLY_TAKEN";
+    } else if (state == BRANCH_STATE_WEAKLY_NOT_TAKEN) {
+        return "WEAKLY_NOT_TAKEN";
+    } else if (state == BRANCH_STATE_WEAKLY_TAKEN) {
+        return "WEAKLY_TAKEN";
+    } else {
+        return "NONE";
+    }
+}
+
 // prints the contents of an instruction
 void printInstruction(Instruction inst) {
 
     // TODO printing certain instructions got messed up for some reason...
     // like the add R1, R1, R1??? and it was sourcereg2 that did it i think hmm
 
-    printf("instruction: label: %s, type: %i, imm: %i, destReg: %s, sourceReg1: %s, sourceReg2: %s, \n", 
-        inst.label, inst.type, inst.imm, inst.destReg->name, inst.source1Reg->name, inst.source2Reg->name);
+    printf("instruction: addr: %i, label: %s, type: %i, imm: %i, destReg: %s, sourceReg1: %s, sourceReg2: %s, ", 
+        inst.addr, inst.label, inst.type, inst.imm, inst.destReg->name, inst.source1Reg->name, inst.source2Reg->name);
     printf("renamedDest: %s, renamedSource1: %s, renamedSource2: %s, branchTargetAddr: %i, branchTargetLabel: %s\n", 
         physicalRegisterNameToString(inst.destPhysReg), physicalRegisterNameToString(inst.source1PhysReg), physicalRegisterNameToString(inst.source2PhysReg), 
         inst.branchTargetAddr, inst.branchTargetLabel);

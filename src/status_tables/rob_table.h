@@ -15,6 +15,9 @@ typedef struct ROBStatusTableEntry {
     int intValue;
     float floatValue;
     int instResultValueType; // InstructionResultValueType enum
+    int fuType;
+    int addr;
+    int flushed;
 
     // TODO: need something to store the address for stores
 
@@ -36,3 +39,4 @@ int addInstToROB(ROBStatusTable *robTable, Instruction *inst);
 void printROBStatusTable(ROBStatusTable *robTable);
 ROBStatusTableEntry *getHeadROBEntry(ROBStatusTable *robTable);
 int isROBEmpty(ROBStatusTable *robTable);
+void flushROB(ROBStatusTable *robTable);

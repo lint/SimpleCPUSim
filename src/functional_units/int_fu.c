@@ -35,7 +35,9 @@ void printIntFunctionalUnit(IntFunctionalUnit *intFU) {
 
     for (int i = 0; i < intFU->latency; i++) {
         printf("\tstage: %i, ", i);
+       
         IntFUResult *stageElement = intFU->stages[i];
+       
         if (!stageElement) {
             printf("NULL\n");
         } else {
@@ -43,6 +45,16 @@ void printIntFunctionalUnit(IntFunctionalUnit *intFU) {
                 stageElement, stageElement->source1, stageElement->source2, stageElement->result, stageElement->destROB);
         }
     }
+}
+
+// removes the content of the the int functional unit
+void flushIntFunctionalUnit(IntFunctionalUnit *intFU) {
+    
+    for (int i = 0; i < intFU->latency; i++) {
+        intFU->stages[i] = NULL;
+    }
+
+    intFU->isStalled = 0;
 }
 
 // perform INT functional unit operations during a cycle
@@ -78,14 +90,14 @@ void cycleIntFunctionalUnit(IntFunctionalUnit *intFU, StatusTables *statusTables
         }
 
         // if both operands of the reservation station and the instruction's state is "issued" then it can be brought into the functional unit
-        if (resStationEntry->busy && (resStationEntry->vjIsAvailable && resStationEntry->vkIsAvailable) && robEntry->state == STATE_ISSUED) {
+        if (resStationEntry->busy && (resStationEntry->vjIsAvailable && resStationEntry->vkIsAvailable) && robEntry->state == INST_STATE_ISSUED) {
 
             printf("selecting reservation station: INT[%d] for execution\n", resStationEntry->resStationIndex);
             
             intFU->lastSelectedResStation = nextResStation;
 
             // update entry in ROB to "executing"
-            robEntry->state = STATE_EXECUTING;
+            robEntry->state = INST_STATE_EXECUTING;
 
             // allocate and initialize the next result which will get passed through the stages of the functional unit
             nextResult = malloc(sizeof(IntFUResult));

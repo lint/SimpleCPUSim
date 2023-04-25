@@ -74,6 +74,7 @@ void processInput(char *inputFn, CPU *cpu) {
     char buf[bufSize];
     int isProcessingInsts = 0;
     int readError = 0;
+    int numInsts = 0;
 
     // read input file line by line
     while (fgets(buf, bufSize, fp) != NULL) {
@@ -118,123 +119,60 @@ void processInput(char *inputFn, CPU *cpu) {
                 break;
             } else {
                 // no errors, write the byte
-                writeByteToDataCache(cpu->dataCache, address, (unsigned char)value);
+                //writeByteToDataCache(cpu->dataCache, address, (unsigned char)value);
+                writeFloatToDataCache(cpu->dataCache, address, (float)value);
             }
 
         // proces instructions
         } else {
 
-            // initialize instruction
-            Instruction inst;
-            inst.type = INST_TYPE_NONE;
-            inst.destReg = NULL;
-            inst.source1Reg = NULL;
-            inst.source2Reg = NULL;
-            inst.destPhysReg = PHYS_REG_NONE;
-            inst.source1PhysReg = PHYS_REG_NONE;
-            inst.source2PhysReg = PHYS_REG_NONE;
-            inst.imm = 0;
-            inst.label[0] = '\0';
-            inst.branchTargetLabel[0] = '\0';
-            inst.branchTargetAddr = 0;
-            inst.regsWereRenamed = 0;
-            enum InstructionType type;
+            int size = strlen(buf);
 
-            // get the first token of the line
-            char *cur = strtok(buf, " \n\t,");
-
-            if (cur == NULL) {
+            if (size == 0) {
+                printf("error: tried to process instruction that was empty\n");
+                readError = 1;
                 break;
             }
 
-            // the first token containing a colon indicates it is a label
-            if (strstr(cur, ":")) {
-                // printf("found label: %s\n", cur);
-                
-                memcpy(inst.label, cur, strlen(cur)-1);
-                inst.label[strlen(cur)-1] = '\0';
-
-                cur = strtok(NULL, " \n\t,");
-            }
+            // strip leading and tailing whitespace from the buffer
+            char *start = buf;
+            char *end = start + size - 1;
+            int numLeadingSpaces = 0;
+            int numTailingSpaces = 0;
             
-            // convert the instruction type to an enum
-            inst.type = stringToInstructionType(cur);
-
-            // instruction type could not be matched
-            if (inst.type == INST_TYPE_NONE) {
-                
-                printf("error: invalid instruction type '%s'\n", cur);
-                readError = 1;
-                break;
-
-            // memory access instructions
-            } else if (inst.type == FLD || inst.type == FSD) {
-
-                inst.destReg = stringToArchRegister(strtok(NULL, " \n\t,"));
-                inst.imm = atoi(strtok(NULL, " \n\t,()"));
-                inst.source1Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
-
-                if (!inst.destReg || !inst.source1Reg) {
-                    printf("error: invalid register in instruction: '%s'\n", buf);
-                    readError = 1;
-                    break;
-                }
-
-            // register-immediate instruction
-            } else if (inst.type == ADDI) {
-
-                inst.destReg = stringToArchRegister(strtok(NULL, " \n\t,"));
-                inst.source1Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
-                inst.imm = atoi(strtok(NULL, " \n\t,"));
-
-                if (!inst.destReg || !inst.source1Reg) {
-                    printf("error: invalid register in instruction: '%s'\n", buf);
-                    readError = 1;
-                    break;
-                }
-
-            // register-register instructions
-            } else if (inst.type == ADD || inst.type == SLT || inst.type == FADD || inst.type == FSUB || inst.type == FMUL || inst.type == FDIV) {
-                
-                inst.destReg = stringToArchRegister(strtok(NULL, " \n\t,"));
-                inst.source1Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
-                inst.source2Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
-
-                if (!inst.destReg || !inst.source1Reg || !inst.source2Reg) {
-                    printf("error: invalid register in instruction: '%s'\n", buf);
-                    readError = 1;
-                    break;
-                }
-
-            // branch instruction
-            } else if (inst.type == BNE) {
-
-                inst.source1Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
-                inst.source2Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
-                char *targetLabel = strtok(NULL, " \n\t,");
-                memcpy(inst.branchTargetLabel, targetLabel, strlen(targetLabel));
-                inst.branchTargetLabel[strlen(targetLabel)] = '\0';
-
-                if (!targetLabel) {
-                    printf("error: invalid target label in instruction: '%s'\n", buf);
-                    readError = 1;
-                    break;
-                } else if (!inst.source1Reg || !inst.source2Reg) {
-                    printf("error: invalid register in instruction: '%s'\n", buf);
-                    readError = 1;
-                    break;
-                }
-
-            } else {
-                printf("error: could not match this point should never be reached...\n");
-                readError = 1;
-                break;
+            while (*start && isspace(*start)) {
+                start++;
+                numLeadingSpaces++;
             }
 
-            // printInstruction(inst);
+            while (end >= start && isspace(*end)) {
+                end--;
+                numTailingSpaces++;
+            }
+            *(end + 1) = '\0';
+
+            // copy the line to the instruction char buffer
+            char *instStr = malloc(bufSize * sizeof(char));
+
+            memcpy(instStr, start, bufSize - numLeadingSpaces - numTailingSpaces);
+
+            // check if the instruction has a label and if so, add it to the label table
+            // this is done so that branch instructions are able to get the target address which is normally encoded into the instruction by an assembler / compiler as an offset of the branch's address
+            char *colon = strstr(instStr, ":");
+            if (colon) {
+                int colonIndex = colon - instStr;
+                char *label = malloc((colonIndex + 1) * sizeof(char));
+                memcpy(label, instStr, colonIndex);
+                label[colonIndex] = '\0';
+
+                addEntryToLabelTable(cpu->labelTable, numInsts * 4, label);
+            }
+
+            // TODO: remove this? printInstruction(inst);
 
             // add the parsed instruction to the cache
-            addInstructionToCache(cpu->instCache, inst);
+            addInstructionToCache(cpu->instCache, instStr);
+            numInsts++;
         }      
     }
     fclose(fp);
@@ -266,7 +204,6 @@ int main(int argc, char *argv[]) {
     processInput(argv[2], &cpu);
     printDataCache(cpu.dataCache);
     executeCPU(&cpu);
-   
 
     return 0;
 }

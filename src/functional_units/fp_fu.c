@@ -48,6 +48,16 @@ void printFPFunctionalUnit(FPFunctionalUnit *fpFU) {
     }
 }
 
+// removes the content of the the int functional unit
+void flushFPFunctionalUnit(FPFunctionalUnit *fpFU) {
+    
+    for (int i = 0; i < fpFU->latency; i++) {
+        fpFU->stages[i] = NULL;
+    }
+
+    fpFU->isStalled = 0;
+}
+
 // perform fp functional unit operations during a cycle
 void cycleFPFunctionalUnit(FPFunctionalUnit *fpFU, StatusTables *statusTables) {
     printf("\nperforming fp functional unit (%s) operations...\n", fuTypeToString(fpFU->fuType));
@@ -81,14 +91,14 @@ void cycleFPFunctionalUnit(FPFunctionalUnit *fpFU, StatusTables *statusTables) {
         }
 
         // if both operands of the reservation station and the instruction's state is "issued" then it can be brought into the functional unit
-        if (resStationEntry->busy && (resStationEntry->vjIsAvailable && resStationEntry->vkIsAvailable) && robEntry->state == STATE_ISSUED) {
+        if (resStationEntry->busy && (resStationEntry->vjIsAvailable && resStationEntry->vkIsAvailable) && robEntry->state == INST_STATE_ISSUED) {
 
             printf("selecting reservation station: %s[%d] for execution\n", fuTypeToString(fpFU->fuType), resStationEntry->resStationIndex);
             
             fpFU->lastSelectedResStation = nextResStation;
 
             // update entry in ROB to "executing"
-            robEntry->state = STATE_EXECUTING;
+            robEntry->state = INST_STATE_EXECUTING;
 
             // allocate and initialize the next result which will get passed through the stages of the functional unit
             nextResult = malloc(sizeof(FloatFUResult));

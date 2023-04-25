@@ -18,4 +18,5 @@ void initIntFunctionalUnit(IntFunctionalUnit *intFU, int latency);
 void teardownIntFunctionalUnit(IntFunctionalUnit *intFU);
 IntFUResult *getCurrentIntFunctionalUnitResult(IntFunctionalUnit *intFU);
 void printIntFunctionalUnit(IntFunctionalUnit *intFU);
+void flushIntFunctionalUnit(IntFunctionalUnit *intFU);
 void cycleIntFunctionalUnit(IntFunctionalUnit *intFU, StatusTables *statusTables);

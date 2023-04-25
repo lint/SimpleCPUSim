@@ -8,7 +8,7 @@
 #include "../status_tables/status_tables.h"
 
 // initialize a decode unit struct
-void initDecodeUnit(DecodeUnit *decodeUnit, int NI, int NW, Instruction **fetchBuffer, int *fetchBufferSize, int *numInstsInBuffer) {
+void initDecodeUnit(DecodeUnit *decodeUnit, int NI, int NW, FetchBufferEntry **fetchBuffer, int *fetchBufferSize, int *numInstsInBuffer) {
 
     decodeUnit->NI = NI;
     decodeUnit->NW = NW;
@@ -74,26 +74,138 @@ void teardownDecodeUnit(DecodeUnit *decodeUnit) {
         currMapTableEntry = currMapTableEntry->next;
         free(prevMapTableEntry);
     }
-
-    // // free the integer register map table
-    // if (decodeUnit->intRegMapTable) {
-    //     for (int i = 0; i < INT_REG_SIZE; i++) {
-    //         cur = decodeUnit->intRegMapTable[i];
-    //         prev = NULL;
-            
-    //         while (cur) {
-    //             prev = cur;
-    //             cur = cur->next;
-    //             free(prev);
-    //         }        
-    //     }   
-
-    //     free(decodeUnit->intRegMapTable);
-    // }
 }
 
 // adds an instruction to the decode queue
-void addInstructionToDecodeQueue(DecodeUnit *decodeUnit, Instruction *inst) {
+void addInstructionToDecodeQueue(DecodeUnit *decodeUnit, LabelTable *labelTable, char *instStr, int instAddr) {
+
+    // initialize instruction
+    Instruction *inst = malloc(sizeof(Instruction));
+    inst->type = INST_TYPE_NONE;
+    inst->destReg = NULL;
+    inst->source1Reg = NULL;
+    inst->source2Reg = NULL;
+    inst->destPhysReg = PHYS_REG_NONE;
+    inst->source1PhysReg = PHYS_REG_NONE;
+    inst->source2PhysReg = PHYS_REG_NONE;
+    inst->imm = 0;
+    inst->label[0] = '\0';
+    inst->branchTargetLabel[0] = '\0';
+    inst->branchTargetAddr = 0;
+    inst->regsWereRenamed = 0;
+    inst->addr = instAddr;
+
+    // copy input string to buffer so that it does not modified by strtok
+    char instBuf[256];
+    strcpy(instBuf, instStr);
+    strcpy(inst->fullStr, instStr);
+
+    printf("inst: %s\n", inst->fullStr);
+
+    // get the first token of the line
+    char *cur = strtok(instBuf, " \n\t,");
+
+    if (cur == NULL) {
+        exit(1);
+    }
+
+    // the first token containing a colon indicates it is a label
+    if (strstr(cur, ":")) {
+        // printf("found label: %s\n", cur);
+        
+        memcpy(inst->label, cur, strlen(cur)-1);
+        inst->label[strlen(cur)-1] = '\0';
+
+        cur = strtok(NULL, " \n\t,");
+    }
+    
+    // convert the instruction type to an enum
+    inst->type = stringToInstructionType(cur);
+
+    // instruction type could not be matched
+    if (inst->type == INST_TYPE_NONE) {
+        
+        printf("error: invalid instruction type '%s'\n", cur);
+        exit(1);
+
+    // memory access instructions
+    } else if (inst->type == FLD) {
+
+        inst->destReg = stringToArchRegister(strtok(NULL, " \n\t,"));
+        inst->imm = atoi(strtok(NULL, " \n\t,()"));
+        inst->source1Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
+
+        if (!inst->destReg || !inst->source1Reg) {
+            printf("error: invalid register in instruction: '%s'\n", instBuf);
+            exit(1);
+        }
+
+    } else if (inst->type == FSD) {
+
+        // inst->destReg = stringToArchRegister(strtok(NULL, " \n\t,"));
+        inst->source1Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
+        inst->imm = atoi(strtok(NULL, " \n\t,()"));
+        inst->source2Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
+
+        // if (!inst->destReg || !inst->source1Reg) {
+        if (!inst->source1Reg || !inst->source2Reg) {
+            printf("error: invalid register in instruction: '%s'\n", instBuf);
+            exit(1);
+        }
+
+    // register-immediate instruction
+    } else if (inst->type == ADDI) {
+
+        inst->destReg = stringToArchRegister(strtok(NULL, " \n\t,"));
+        inst->source1Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
+        inst->imm = atoi(strtok(NULL, " \n\t,"));
+
+        if (!inst->destReg || !inst->source1Reg) {
+            printf("error: invalid register in instruction: '%s'\n", instBuf);
+            exit(1);
+        }
+
+    // register-register instructions
+    } else if (inst->type == ADD || inst->type == SLT || inst->type == FADD || inst->type == FSUB || inst->type == FMUL || inst->type == FDIV) {
+        
+        inst->destReg = stringToArchRegister(strtok(NULL, " \n\t,"));
+        inst->source1Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
+        inst->source2Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
+
+        if (!inst->destReg || !inst->source1Reg || !inst->source2Reg) {
+            printf("error: invalid register in instruction: '%s'\n", instBuf);
+            exit(1);
+        }
+
+    // branch instruction
+    } else if (inst->type == BNE) {
+
+        inst->source1Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
+        inst->source2Reg = stringToArchRegister(strtok(NULL, " \n\t,"));
+        char *targetLabel = strtok(NULL, " \n\t,");
+        memcpy(inst->branchTargetLabel, targetLabel, strlen(targetLabel));
+        inst->branchTargetLabel[strlen(targetLabel)] = '\0';
+
+        // branch instructions store the pc offset to the target instruction in the imm field (in real implementations this is encoded in instruction already)
+        // TODO: 
+        inst->imm = getAddressForLabel(labelTable, inst->branchTargetLabel) - inst->addr;
+        // inst->imm = getAddressForLabel(labelTable, inst->branchTargetLabel);
+
+        printf("\n\n\ngetAddressForLabel: %i, inst->addr: %i\n\n\n", getAddressForLabel(labelTable, inst->branchTargetLabel), inst->addr);
+
+        if (!targetLabel) {
+            printf("error: invalid target label in instruction: '%s'\n", instBuf);
+            exit(1);
+        } else if (!inst->source1Reg || !inst->source2Reg) {
+            printf("error: invalid register in instruction: '%s'\n", instBuf);
+            exit(1);
+        }
+
+    } else {
+        printf("error: could not match this point should never be reached...\n");
+        exit(1);
+    }
+
     decodeUnit->decodeQueue[decodeUnit->numInstsInQueue++] = inst;
     printf("added instruction: %p to decode queue, numInstsInQueue: %i\n", inst, decodeUnit->numInstsInQueue);
 }
@@ -124,22 +236,6 @@ void printMapTable(DecodeUnit *decodeUnit) {
 
         currMapTableEntry = currMapTableEntry->next;
     }
-
-    // for (int i = 0; i < INT_REG_SIZE; i++) {
-    //     RegisterMappingNode *curNode = decodeUnit->intRegMapTable[i];
-
-    //     if (curNode) {
-
-    //         printf("\t%s: ", intRegisterNameToString(i));
-            
-    //         while (curNode->next) {
-    //             printf("%s -> ", renameRegisterNameToString(curNode->reg));
-    //             curNode = curNode->next;
-    //         }
-
-    //         printf("%s\n", renameRegisterNameToString(curNode->reg));
-    //     }
-    // }
 }
 
 // prints the current state of the free list
@@ -213,7 +309,7 @@ MapTableEntry *mapTableEntryForRegister(DecodeUnit *decodeUnit, ArchRegister *re
 
     MapTableEntry *curr = decodeUnit->mapTableHead;
 
-    if (!curr) {
+    if (!curr || !reg) {
         return NULL;
     }
 
@@ -319,7 +415,7 @@ RegisterMappingNode *getFreeListTailNode(DecodeUnit *decodeUnit) {
 }
 
 // removes the oldest physical register in the map table for a given register and adds it back to the free list
-void popOldPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ArchRegister *reg) {
+void popOldPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ArchRegister *reg, int addToTail) {
 
     MapTableEntry *entry = mapTableEntryForRegister(decodeUnit, reg);
 
@@ -347,17 +443,88 @@ void popOldPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ArchRegister *r
     // remove the last node from the mapping list
     prev->next = NULL;
 
-    RegisterMappingNode *freeListTail = getFreeListTailNode(decodeUnit);
+    // add physical register to end of the free list
+    if (addToTail) {
+        RegisterMappingNode *freeListTail = getFreeListTailNode(decodeUnit);
 
-    printf("adding physical register: %s to the end of the free list\n", physicalRegisterNameToString(curr->reg));
+        printf("adding physical register: %s to the end of the free list\n", physicalRegisterNameToString(curr->reg));
 
-    // add the physical register node to the end of the free list
-    if (freeListTail) {
-        freeListTail->next = curr;
+        // add the physical register node to the end of the free list
+        if (freeListTail) {
+            freeListTail->next = curr;
+        
+        // the free list is currently empty, set the popped node as the head
+        } else {
+            decodeUnit->freeList = curr;
+        }
     
-    // the free list is currently empty, set the popped node as the head
+    // add physical register to head of free list
     } else {
+        curr->next = decodeUnit->freeList;
         decodeUnit->freeList = curr;
+    }
+}
+
+// removes the newest physical register in the map table for a given register and adds it back to the free list
+void popNewPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ArchRegister *reg, int addToTail) {
+
+    MapTableEntry *entry = mapTableEntryForRegister(decodeUnit, reg);
+
+    if (!entry) {
+        printf("error: tried to pop newest physical register mapping for reg: %s which does not have a map table entry\n", reg->name);
+        return;
+    }
+
+    // int numMappings = numPhysicalRegisterMappingsForReg(decodeUnit, reg);
+
+    // // do not try to pop mapping if there are no older mappings (also ensures that the first curr->next below exists)
+    // if (numMappings <= 1) {
+    //     printf("error: tried to pop a mapping for reg: %s but there are no older mappings\n", reg->name);
+    //     return;
+    // }
+
+    // get the oldest mapping for the register
+    // RegisterMappingNode *curr = entry->mapHead;
+    // RegisterMappingNode *prev = NULL;
+    // while (curr->next) {
+    //     prev = curr;
+    //     curr = curr->next;
+    // }
+
+    // // remove the last node from the mapping list
+    // prev->next = NULL;
+
+    RegisterMappingNode *poppedNode = entry->mapHead;
+    
+    if (!poppedNode) {
+        printf("error: tried to pop newest node for register: %s but it does not exist\n", reg->name);
+    } else {
+        printf("popping mapping: %s from map table for: %s\n", physicalRegisterNameToString(poppedNode->reg), reg->name);
+    }
+
+
+    entry->mapHead = poppedNode->next;
+    poppedNode->next = NULL;
+
+    // add physical register to end of the free list
+    if (addToTail) {
+        RegisterMappingNode *freeListTail = getFreeListTailNode(decodeUnit);
+
+        printf("adding physical register: %s to the end of the free list\n", physicalRegisterNameToString(poppedNode->reg));
+
+        // add the physical register node to the end of the free list
+        if (freeListTail) {
+            freeListTail->next = poppedNode;
+        
+        // the free list is currently empty, set the popped node as the head
+        } else {
+            decodeUnit->freeList = poppedNode;
+        }
+    
+    // add physical register to head of free list
+    } else {
+        poppedNode->next = decodeUnit->freeList;
+        decodeUnit->freeList = poppedNode;
     }
 }
 
@@ -380,12 +547,12 @@ int numPhysicalRegistersNeededForInst(DecodeUnit *decodeUnit, Instruction *inst)
     } else if (inst->type == FSD) {
 
         // check if dest register doesn't have a mapping
-        if (physicalRegisterMappingForReg(decodeUnit, inst->destReg) == PHYS_REG_NONE) {
+        if (physicalRegisterMappingForReg(decodeUnit, inst->source1Reg) == PHYS_REG_NONE) {
             numNeeded++;
         }
 
         // check if source register doesn't have a mapping
-        if (physicalRegisterMappingForReg(decodeUnit, inst->source1Reg) == PHYS_REG_NONE) {
+        if (physicalRegisterMappingForReg(decodeUnit, inst->source2Reg) == PHYS_REG_NONE) {
             numNeeded++;
         }
 
@@ -434,7 +601,8 @@ int performRegisterRenamingForInst(DecodeUnit *decodeUnit, Instruction *inst) {
     }
     
     // rename registers for each type of instruction
-    if (inst->type == FLD || inst->type == ADDI) {
+    // if (inst->type == FLD || inst->type == ADDI) {
+    if (inst->type == ADDI) {
 
         // get source register mapping
         enum PhysicalRegisterName source1PhysReg = readMapTableForReg(decodeUnit, inst->source1Reg);
@@ -452,7 +620,7 @@ int performRegisterRenamingForInst(DecodeUnit *decodeUnit, Instruction *inst) {
         addPhysicalRegisterToMapTable(decodeUnit, destFreeNode, inst->destReg);
         inst->destPhysReg = destFreeNode->reg;
 
-    } else if (inst->type == FSD) {
+    } else if (inst->type == FLD) {
 
         // get register mappings
         enum PhysicalRegisterName destPhysReg = readMapTableForReg(decodeUnit, inst->destReg);
@@ -473,6 +641,30 @@ int performRegisterRenamingForInst(DecodeUnit *decodeUnit, Instruction *inst) {
             source1PhysReg = freeNode->reg;
         }
         inst->source1PhysReg = source1PhysReg;
+
+    } else if (inst->type == FSD) {
+
+        // get source register mappings
+        enum PhysicalRegisterName source1PhysReg = readMapTableForReg(decodeUnit, inst->source1Reg);
+        enum PhysicalRegisterName source2PhysReg = readMapTableForReg(decodeUnit, inst->source2Reg);
+
+        // check if source1 register doesn't have a mapping
+        if (source1PhysReg == PHYS_REG_NONE) {
+            RegisterMappingNode *freeNode = getFreePhysicalRegister(decodeUnit);
+            addPhysicalRegisterToMapTable(decodeUnit, freeNode, inst->source1Reg);
+            source1PhysReg = freeNode->reg;
+        }
+        inst->source1PhysReg = source1PhysReg;
+
+        // check if source2 register doesn't have a mapping
+        if (source2PhysReg == PHYS_REG_NONE) {
+            RegisterMappingNode *freeNode = getFreePhysicalRegister(decodeUnit);
+            addPhysicalRegisterToMapTable(decodeUnit, freeNode, inst->source2Reg);
+            source2PhysReg = freeNode->reg;
+        }
+        inst->source2PhysReg = source2PhysReg;
+
+        // TODO: same as BNE?
 
     } else if (inst->type == ADD || inst->type == SLT || inst->type == FADD || inst->type == FSUB || inst->type == FMUL || inst->type == FDIV) {
 
@@ -533,7 +725,7 @@ int performRegisterRenamingForInst(DecodeUnit *decodeUnit, Instruction *inst) {
 }
 
 // execute decode unit's operations during a clock cycle
-void cycleDecodeUnit(DecodeUnit *decodeUnit, StatusTables *statusTables, RegisterFile *regFile, StallStats *stallStats) {
+void cycleDecodeUnit(DecodeUnit *decodeUnit, StatusTables *statusTables, RegisterFile *regFile, StallStats *stallStats, LabelTable *labelTable) {
 
     printf("\nperforming decode unit operations...\n");
     printf("num insts in buffer: %i\n", *decodeUnit->numInstsInBuffer);
@@ -546,16 +738,18 @@ void cycleDecodeUnit(DecodeUnit *decodeUnit, StatusTables *statusTables, Registe
 
     // loop through all instructions in the input buffer
     for (int i = 0; i < *decodeUnit->numInstsInBuffer; i++) {
-        Instruction *inst = decodeUnit->fetchBuffer[i];
+        FetchBufferEntry *entry = decodeUnit->fetchBuffer[i];
 
-        if (!inst) {
+        printf("entry: %p\n", entry);
+
+        if (!entry) {
             printf("error: was unable to get instruction from decode input buffer when expected\n");
             exit(1);
         }
 
         // attempt to add instruction to the decode queue
         if (decodeUnit->numInstsInQueue < decodeUnit->NI) {
-            addInstructionToDecodeQueue(decodeUnit, inst);
+            addInstructionToDecodeQueue(decodeUnit, labelTable, entry->instStr, entry->instAddr);
             numInstsMovedToQueue++;
         } else {
             // exit loop if queue is full
@@ -566,6 +760,7 @@ void cycleDecodeUnit(DecodeUnit *decodeUnit, StatusTables *statusTables, Registe
     // remove instructions from fetch buffer that were moved to the decode queue
     if (numInstsMovedToQueue > 0) {
         for (int i = numInstsMovedToQueue; i < *decodeUnit->numInstsInBuffer; i++) {
+            free(decodeUnit->fetchBuffer[i - numInstsMovedToQueue]);
             decodeUnit->fetchBuffer[i - numInstsMovedToQueue] = decodeUnit->fetchBuffer[i];
             decodeUnit->fetchBuffer[i] = NULL;
         }
@@ -578,54 +773,28 @@ void cycleDecodeUnit(DecodeUnit *decodeUnit, StatusTables *statusTables, Registe
         return;
     }
 
-    printf("attempting to rename instructions...\n");
+    // printf("attempting to rename instructions...\n");
 
     // attempt to rename registers for instructions in the decode queue
-    for (int i = 0; i < decodeUnit->numInstsInQueue; i++) {
-        Instruction *inst = decodeUnit->decodeQueue[i];
-        enum InstructionType instType = inst->type;
+    // for (int i = 0; i < decodeUnit->numInstsInQueue; i++) {
+    //     Instruction *inst = decodeUnit->decodeQueue[i];
+    //     enum InstructionType instType = inst->type;
 
-        // do not rename instructions that were previously renamed
-        if (inst->regsWereRenamed) {
-            continue;
-        }
+    //     // do not rename instructions that were previously renamed
+    //     if (inst->regsWereRenamed) {
+    //         continue;
+    //     }
 
-        // perform the renaming
-        int renamingWasSuccessful = performRegisterRenamingForInst(decodeUnit, inst);
+    //     // perform the renaming
+    //     int renamingWasSuccessful = performRegisterRenamingForInst(decodeUnit, inst);
 
-
-        // TODO: remove this
-        // if (numFreeRenameRegistersAvailable(decodeUnit) >= 1) {
-
-        //     RegisterMappingNode *renameRegNode = getFreeRenameRegister(decodeUnit);
-
-        //     if (instType == ADDI || instType == ADD || instType == SLT) {
-
-        //         addRenameRegisterToIntMapTable(decodeUnit, renameRegNode, inst->destReg);
-
-        //     } else if (instType == FADD || instType == FSUB || instType == FMUL || instType == FDIV || instType == FLD) {
-
-        //         addRenameRegisterToFloatMapTable(decodeUnit, renameRegNode, inst->destReg);
-
-        //     } else if (instType == FSD) {
-        //         // TODO
-        //     } else if (instType == BNE ) {
-        //         // TODO
-        //     } else {
-        //         // probably unnecessary to have at this point..
-        //     }
-
-        //     inst->renamedDestReg = renameRegNode->reg;
-        //     inst->regsWereRenamed = 1;
-        // }
-
-        if (renamingWasSuccessful) {
-            printf("successfully renamed inst: %p\n", inst);
-        } else {
-            printf("could not rename inst: %p, will again next cycle\n", inst);
-            break;
-        }
-    }
+    //     if (renamingWasSuccessful) {
+    //         printf("successfully renamed inst: %p\n", inst);
+    //     } else {
+    //         printf("could not rename inst: %p, will again next cycle\n", inst);
+    //         break;
+    //     }
+    // }
 
     printMapTable(decodeUnit);
 
@@ -640,15 +809,24 @@ void cycleDecodeUnit(DecodeUnit *decodeUnit, StatusTables *statusTables, Registe
         enum InstructionType instType = inst->type;
 
         // stop issuing if the registers were not renamed
-        if (!inst->regsWereRenamed) {
-            printf("could not issue next instruction: %p as it has not gone through register renaming yet\n", inst);
-            break;
-        }
+        // if (!inst->regsWereRenamed) {
+        //     printf("could not issue next instruction: %p as it has not gone through register renaming yet\n", inst);
+        //     break;
+        // }
 
         // issue instruction if free slot in ROB and reservation station is available
         if (isFreeEntryInROB(robTable) && isFreeResStationForInstruction(resStationTable, inst)) {
+            
+            int renamingWasSuccessful = performRegisterRenamingForInst(decodeUnit, inst);
+            if (!renamingWasSuccessful) {
+                printf("could not issue next instruction: %p as it has not gone through register renaming yet\n", inst);
+                break;
+            }
+            
             numInstsIssued++;
             printInstruction(*inst);
+
+
             
             // add entry in the ROB for the given instruction and get the index it is stored at
             int robIndex = addInstToROB(robTable, inst);
@@ -662,6 +840,7 @@ void cycleDecodeUnit(DecodeUnit *decodeUnit, StatusTables *statusTables, Registe
             // } else if (instType == FADD || instType == FSUB || instType == FMUL || instType == FDIV || instType == FLD) {
             //     setRegisterStatusTableFloatEntryVal(regTable, inst->destReg, robIndex);
             // }
+            // TODO: remove this
             setRegisterStatusTableEntryROBIndex(regTable, inst->destReg, robIndex);
         } else {
 
@@ -691,4 +870,21 @@ void cycleDecodeUnit(DecodeUnit *decodeUnit, StatusTables *statusTables, Registe
 
         decodeUnit->numInstsInQueue -= numInstsIssued;
     }
+}
+
+// clears all instructions in the fetch buffer and decode queue
+void flushFetchBufferAndDecodeQueue(DecodeUnit *decodeUnit) {
+
+    // clear fetch buffer
+    for (int i = 0; i < *decodeUnit->numInstsInBuffer; i++) {
+        decodeUnit->fetchBuffer[i] = NULL;
+    }
+    *decodeUnit->numInstsInBuffer = 0;
+
+    // clear decode queue
+    for (int i = 0; i < decodeUnit->numInstsInQueue; i++) {
+        decodeUnit->decodeQueue[i] = NULL;
+        // TODO: free instruction?
+    }
+    decodeUnit->numInstsInQueue = 0;
 }

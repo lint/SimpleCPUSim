@@ -19,12 +19,15 @@ void initROBStatusTable(ROBStatusTable *robTable, int NR) {
         entry->index = i;
         entry->busy = 0;
         entry->inst = NULL;
-        entry->state = STATE_NONE;
+        entry->state = INST_STATE_NONE;
         entry->destReg = NULL;
         entry->renamedDestReg = PHYS_REG_NONE;
         entry->intValue = 0;
         entry->floatValue = 0;
         entry->instResultValueType = VALUE_TYPE_NONE;
+        entry->fuType = FU_TYPE_NONE;
+        entry->addr = -1;
+        entry->flushed = 0;
 
         robTable->entries[i] = entry;
     }
@@ -69,20 +72,38 @@ int addInstToROB(ROBStatusTable *robTable, Instruction *inst) {
 
     entry->busy = 1;
     entry->inst = inst;
-    entry->state = STATE_ISSUED;
+    entry->state = INST_STATE_ISSUED;
     entry->destReg = inst->destReg;
     entry->renamedDestReg = inst->destPhysReg;
     entry->intValue = 0;
     entry->floatValue = 0;
+    entry->addr = -1;
+    entry->flushed = 0;
 
     // TODO: also need to support address for store operations..............
 
     enum InstructionType instType = inst->type;
     if (instType == ADD || instType == ADDI || instType == SLT) {
         entry->instResultValueType = VALUE_TYPE_INT;
+        entry->fuType = FU_TYPE_INT;
     } else if (instType == FLD || instType == FSD || instType == FADD || instType == FSUB || instType == FMUL || instType == FDIV) {
         entry->instResultValueType = VALUE_TYPE_FLOAT;
+
+        if (instType == FADD || instType == FSUB) {
+            entry->fuType = FU_TYPE_FPADD;
+        } else if (instType == FLD) {
+            entry->fuType = FU_TYPE_LOAD;
+        } else if (instType == FSD) {
+            entry->fuType = FU_TYPE_STORE;
+        } else if (instType == FMUL) {
+            entry->fuType = FU_TYPE_FPMUL;
+        } else if (instType == FDIV) {
+            entry->fuType = FU_TYPE_FPDIV;
+        }
+    } else if (instType == BNE) {
+        entry->fuType = FU_TYPE_BU;
     } else {
+        entry->fuType = FU_TYPE_NONE;
         entry->instResultValueType = VALUE_TYPE_NONE;
     }
 
@@ -102,9 +123,9 @@ void printROBStatusTable(ROBStatusTable *robTable) {
         if (entry->destReg) {
             destStr = entry->destReg->name;
         }
-        printf("\trobIndex: %i, busy: %i, inst: %p, dest: %s, renamedDest: %s, intVal: %i, floatVal: %f, ", entry->index, entry->busy, entry->inst, destStr, 
+        printf("\trobIndex: %i, busy: %i, inst: %s, dest: %s, renamedDest: %s, intVal: %i, floatVal: %f, ", entry->index, entry->busy, entry->inst ? entry->inst->fullStr : "null", destStr, 
             physicalRegisterNameToString(entry->renamedDestReg), entry->intValue, entry->floatValue);
-        printf("state: %s, resultType: %s\n", instStateToString(entry->state), valueTypeToString(entry->instResultValueType));
+        printf("state: %s, resultType: %s, flushed: %i\n", instStateToString(entry->state), valueTypeToString(entry->instResultValueType), entry->flushed);
     }
 }
 
@@ -123,4 +144,27 @@ int isROBEmpty(ROBStatusTable *robTable) {
     } 
 
     return 1;
+}
+
+// sets busy = 0 for all entries in the ROB
+void flushROB(ROBStatusTable *robTable) {
+
+    printf("flushing ROB...\n");
+
+    for (int i = 0; i < robTable->NR; i++) {
+        ROBStatusTableEntry *entry = robTable->entries[i];
+        
+        if (entry->index == robTable->headEntryIndex) {
+            continue;
+        }
+        
+        // entry->state = INST_STATE_NONE;
+
+        if (entry->busy) {
+            entry->flushed = 1;
+            entry->busy = 0;
+        }
+        // robTable->entries[i]->busy = 0;
+        // TODO: clean up
+    }
 }

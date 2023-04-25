@@ -2,6 +2,8 @@
 // forward declarations
 typedef struct IntFunctionalUnit IntFunctionalUnit;
 typedef struct FPFunctionalUnit FPFunctionalUnit;
+typedef struct BUFunctionalUnit BUFunctionalUnit;
+typedef struct LSFunctionalUnit LSFunctionalUnit;
 
 // struct containing information for an INT functional unit operation
 typedef struct IntFUResult {
@@ -19,10 +21,30 @@ typedef struct FloatFUResult {
     int destROB;
 } FloatFUResult;
 
+// struct containing infromation for a BU functional unit operation
+typedef struct BUFUResult {
+    int source1;
+    int source2;
+    int isBranchTaken;
+    int effAddr;
+    int destROB;
+} BUFUResult;
+
+// struct containing information for the load/store functional unit operation
+typedef struct LSFUResult {
+    int offset;
+    int base;
+    int resultAddr;
+    int destROB;
+    int fuType; // either FU_TYPE_LOAD or FU_TYPE_STORE
+} LSFUResult;
+
 // struct that bundles the functional units together 
 typedef struct FunctionalUnits {
     IntFunctionalUnit *intFU;
     FPFunctionalUnit *fpAddFU;
     FPFunctionalUnit *fpMulFU;
     FPFunctionalUnit *fpDivFU;
+    BUFunctionalUnit *buFU;
+
 } FunctionalUnits;

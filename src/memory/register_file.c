@@ -96,6 +96,8 @@ void writeRegisterFileInt(RegisterFile *registerFile, enum PhysicalRegisterName 
         exit(1);
     }
 
+    printf("\nwriting int: %i to register: %s\n", value, physicalRegisterNameToString(reg));
+
     // write the value to the register
     RegisterFileEntry *entry = registerFile->physicalRegisters[reg];
     entry->intVal = value;
@@ -118,6 +120,8 @@ void writeRegisterFileFloat(RegisterFile *registerFile, enum PhysicalRegisterNam
         printf("error: tried to write float register: %i which is not in the register file\n", reg);
         exit(1);
     }
+
+    printf("\nwriting float: %f to register: %s\n", value, physicalRegisterNameToString(reg));
 
     // write the value to the register
     RegisterFileEntry *entry = registerFile->physicalRegisters[reg];

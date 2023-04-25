@@ -18,4 +18,5 @@ void initFPFunctionalUnit(FPFunctionalUnit *fpFU, int fuType, int latency);
 void teardownFPFunctionalUnit(FPFunctionalUnit *fpFU);
 FloatFUResult *getCurrentFPFunctionalUnitResult(FPFunctionalUnit *fpFU);
 void printFPFunctionalUnit(FPFunctionalUnit *fpFU);
+void flushFPFunctionalUnit(FPFunctionalUnit *fpFU);
 void cycleFPFunctionalUnit(FPFunctionalUnit *fpFU, StatusTables *statusTables);
