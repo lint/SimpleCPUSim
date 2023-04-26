@@ -9,7 +9,7 @@
 // populates the params struct with values from a config file
 void readConfig(char *configFn, Params *params) {
 
-    printf("processing config file...\n");
+    printf("\nprocessing config file...\n");
 
     // setup default parameter values
     params->NF = 4;
@@ -49,7 +49,6 @@ void readConfig(char *configFn, Params *params) {
                 params->NB = value;
             } else {
                 printf("found invalid key '%s', skipping...\n", key);
-                // continue; not needed as it's the end of the loop
             }
         }
 
@@ -62,7 +61,7 @@ void readConfig(char *configFn, Params *params) {
 // process input file
 void processInput(char *inputFn, CPU *cpu) {
 
-    printf("processing input program file...\n");
+    printf("\nprocessing input program file...\n");
     
     FILE *fp = fopen(inputFn, "r");
     if (fp == NULL) {
@@ -119,7 +118,6 @@ void processInput(char *inputFn, CPU *cpu) {
                 break;
             } else {
                 // no errors, write the byte
-                //writeByteToDataCache(cpu->dataCache, address, (unsigned char)value);
                 writeFloatToDataCache(cpu->dataCache, address, (float)value);
             }
 
@@ -181,10 +179,7 @@ void processInput(char *inputFn, CPU *cpu) {
     }
     fclose(fp);
 
-    // after all instructions have been parsed, resolve branch target labels to addresses
-    int resolveLabelsError = resolveInstLabels(cpu->instCache);
-
-    if (readError || resolveLabelsError) {
+    if (readError) {
         printf("an error was encountered while processing the input file, exiting...\n");
         exit(1);
     }
@@ -201,14 +196,16 @@ int main(int argc, char *argv[]) {
     // process config file
     Params params;
     readConfig(argv[1], &params);
-    // exit(1);
-    // TODO: remove this...
 
     // create new CPU struct and initialize it
     CPU cpu;
     initCPU(&cpu, &params);
     processInput(argv[2], &cpu);
+
+    printf("initial ");
     printDataCache(cpu.dataCache);
+
+    // start executing instructions
     executeCPU(&cpu);
 
     return 0;

@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../misc/misc.h"
-#include "res_station_table.h"
-#include "register_table.h"
 #include "../memory/memory.h"
 #include "../functional_units/functional_units.h"
+#include "register_table.h"
+#include "res_station_table.h"
 
 // returns a new reservation station status table entry allocated on the heap
 ResStationStatusTableEntry *newResStationStatusTableEntry() {
@@ -178,6 +178,7 @@ void teardownResStationStatusTable(ResStationStatusTable *resStationTable) {
 
 // returns the number of reservation stations for a given functional unit
 int numResStationsForFunctionalUnit(ResStationStatusTable *resStationTable, int fuType) {
+    
     if (fuType == FU_TYPE_INT) {
         return resStationTable->numIntStations;
     } else if (fuType == FU_TYPE_LOAD) {
@@ -193,13 +194,14 @@ int numResStationsForFunctionalUnit(ResStationStatusTable *resStationTable, int 
     } else if (fuType == FU_TYPE_BU) {
         return resStationTable->numBUStations;
     } else {
-        printf("error: invalid FunctionalUnitType used while getting number of reservation stations...\n");
+        printf_DEBUG(("error: invalid FunctionalUnitType used while getting number of reservation stations...\n"));
         exit(1);
     }
 }
 
 // returns the reservation station entry list for a given functional unit
 ResStationStatusTableEntry **resStationEntriesForFunctionalUnit(ResStationStatusTable *resStationTable, int fuType) {
+    
     if (fuType == FU_TYPE_INT) {
         return resStationTable->intEntries;
     } else if (fuType == FU_TYPE_LOAD) {
@@ -215,11 +217,12 @@ ResStationStatusTableEntry **resStationEntriesForFunctionalUnit(ResStationStatus
     } else if (fuType == FU_TYPE_BU) {
         return resStationTable->buEntries;
     } else {
-        printf("error: invalid FunctionalUnitType used while get reservation station entries array...\n");
+        printf_DEBUG(("error: invalid FunctionalUnitType used while get reservation station entries array...\n"));
         exit(1);
     }
 }
 
+// returns the reservation station entry in a given functional unit array which while write to a given ROB
 ResStationStatusTableEntry *resStationEntryForFunctionalUnitWithDestROB(ResStationStatusTable *resStationTable, int fuType, int destROB) {
 
     ResStationStatusTableEntry **entries = resStationEntriesForFunctionalUnit(resStationTable, fuType);
@@ -257,7 +260,7 @@ ResStationStatusTableEntry **resStationEntriesForInstruction(ResStationStatusTab
     } else if (instType == BNE) {
         return resStationTable->buEntries;
     } else {
-        printf("got invalid instruction type while trying to get the reservation station entry array for an instruction, this should never happen...");
+        printf_DEBUG(("got invalid instruction type while trying to get the reservation station entry array for an instruction, this should never happen..."));
         exit(1);
     }
 }
@@ -284,8 +287,6 @@ int indexForFreeResStation(ResStationStatusTable *resStationTable, int fuType) {
 // if a reservation station needed for a given instruction is available, return it's index in the reservation stations array, otherwise return -1
 int indexForFreeResStationForInstruction(ResStationStatusTable *resStationTable, Instruction *inst) {
 
-    //printf("indexForFreeResStation: ")
-
     enum InstructionType instType = inst->type;
 
     // search for a reservation station needed by the given instruction
@@ -304,7 +305,7 @@ int indexForFreeResStationForInstruction(ResStationStatusTable *resStationTable,
     } else if (instType == BNE) {
         return indexForFreeResStation(resStationTable, FU_TYPE_BU);
     } else {
-        printf("got invalid instruction type while trying to get the index of a free reservation station, this should never happen...");
+        printf_DEBUG(("got invalid instruction type while trying to get the index of a free reservation station, this should never happen..."));
         exit(1);
     }
 
@@ -370,8 +371,6 @@ void setResStationEntryOperandAvailability(ResStationStatusTableEntry *entry, Re
             entry->vkIsAvailable = 0;
             entry->qk = robIndex;
         }
-
-        // TODO: is there actually anything i need to change here or am i good?
     }
 }
 
@@ -431,6 +430,8 @@ void addInstToResStation(ResStationStatusTable *resStationTable, RegisterStatusT
     // add instructions that need the store functional unit to the reservation station
     } else if (instType == FSD) {
 
+        // in reality stores use the destination field but having it be the source 2 simplified things for implementing this
+
         entry->addr = inst->imm;
         setResStationEntryOperandAvailability(entry, regTable, regFile, 1, inst->source1Reg, inst->source1PhysReg, VALUE_TYPE_FLOAT);
         setResStationEntryOperandAvailability(entry, regTable, regFile, 2, inst->source2Reg, inst->source2PhysReg, VALUE_TYPE_INT);
@@ -445,20 +446,23 @@ void addInstToResStation(ResStationStatusTable *resStationTable, RegisterStatusT
         setResStationEntryOperandAvailability(entry, regTable, regFile, 2, inst->source2Reg, inst->source2PhysReg, VALUE_TYPE_INT);
     }
 
-    // TODO
-
+    #ifdef ENABLE_DEBUG_LOG
     printf("added instruction: %p to reservation station: %i\n", inst, resStationIndex);
+    #endif
 }
 
 // helper method to process int updates for any list of reservation station status table entries
 void processIntUpdateForResStationEntries(ResStationStatusTableEntry **entries, int numEntries, int destROB, int result, int fromCDB) {
 
+    // iterate over all entries of the reservation station
     for (int i = 0; i < numEntries; i++) {
         ResStationStatusTableEntry *entry = entries[i];
 
         // only update the entry's operands if they are currently available and the result ROB matches the source ROB
         if (entry->busy && !entry->vjIsAvailable && entry->qj == destROB) {
+            #ifdef ENABLE_DEBUG_LOG
             printf("reservation station index: %i received int value: %i for vj\n", entry->resStationIndex, result);
+            #endif
 
             entry->vjIsAvailable = 1;
             entry->vjInt = result;
@@ -467,7 +471,9 @@ void processIntUpdateForResStationEntries(ResStationStatusTableEntry **entries, 
         }
 
         if (entry->busy && !entry->vkIsAvailable && entry->qk == destROB) {
+            #ifdef ENABLE_DEBUG_LOG
             printf("reservation station index: %i received int value: %i for vk\n", entry->resStationIndex, result);
+            #endif
 
             entry->vkIsAvailable = 1;
             entry->vkInt = result;
@@ -480,12 +486,15 @@ void processIntUpdateForResStationEntries(ResStationStatusTableEntry **entries, 
 // helper method to process float updates for any list of reservation station status table entries
 void processFloatUpdateForResStationEntries(ResStationStatusTableEntry **entries, int numEntries, int destROB, float result, int fromCDB) {
 
+    // iterate over the reservation station entries
     for (int i = 0; i < numEntries; i++) {
         ResStationStatusTableEntry *entry = entries[i];
 
         // only update the entry's operands if they are currently available and the result ROB matches the source ROB
         if (entry->busy && !entry->vjIsAvailable && entry->qj == destROB) {
+            #ifdef ENABLE_DEBUG_LOG
             printf("reservation station index: %i received float value: %f for vj\n", entry->resStationIndex, result);
+            #endif
 
             entry->vjIsAvailable = 1;
             entry->vjFloat = result;
@@ -494,7 +503,9 @@ void processFloatUpdateForResStationEntries(ResStationStatusTableEntry **entries
         }
 
         if (entry->busy && !entry->vkIsAvailable && entry->qk == destROB) {
+            #ifdef ENABLE_DEBUG_LOG
             printf("reservation station index: %i received forwarded float: %f for vk\n", entry->resStationIndex, result);
+            #endif
 
             entry->vkIsAvailable = 1;
             entry->vkFloat = result;
@@ -507,7 +518,9 @@ void processFloatUpdateForResStationEntries(ResStationStatusTableEntry **entries
 // updates the operands of reservation stations waiting for an integer value
 void sendIntUpdateToResStationStatusTable(ResStationStatusTable *resStationTable, int destROB, int result, int fromCDB) {
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("sending int result: %i robIndex: %i to reservation stations\n", result, destROB);
+    #endif
 
     // forward int result to reservation stations that can use int registers
     processIntUpdateForResStationEntries(resStationTable->intEntries, resStationTable->numIntStations, destROB, result, fromCDB);
@@ -519,7 +532,9 @@ void sendIntUpdateToResStationStatusTable(ResStationStatusTable *resStationTable
 // updates the operands of reservation stations waiting for a float value
 void sendFloatUpdateToResStationStatusTable(ResStationStatusTable *resStationTable, int destROB, float result, int fromCDB) {
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("sending float result: %f robIndex: %i to reservation stations\n", result, destROB);
+    #endif
 
     // forward int result to reservation stations that can use int registers
     processFloatUpdateForResStationEntries(resStationTable->loadEntries, resStationTable->numLoadStations, destROB, result, fromCDB);
@@ -602,7 +617,7 @@ void printResStationStatusTable(ResStationStatusTable *resStationTable) {
 // sets all reservation stations to not busy
 void flushResStationStatusTable(ResStationStatusTable *resStationTable) {
     
-    printf("flushing reservation station status table:\n");
+    printf_DEBUG(("flushing reservation station status table:\n"));
 
     // clear int functional unit reservation stations
     for (int i = 0; i < resStationTable->numIntStations; i++) {

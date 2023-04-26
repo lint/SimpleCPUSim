@@ -7,7 +7,6 @@
 
 // converts a string to the instruction type enum
 enum InstructionType stringToInstructionType(char *s) {
-
     // printf("getting type for: %s\n", s);
 
     if (!strcmp(s, "fld")) {
@@ -168,17 +167,13 @@ char *branchPredictionStateToString(enum BranchPredictionState state) {
 
 // prints the contents of an instruction
 void printInstruction(Instruction inst) {
-
-    // TODO printing certain instructions got messed up for some reason...
-    // like the add R1, R1, R1??? and it was sourcereg2 that did it i think hmm
-
     printf("instruction: addr: %i, label: %s, type: %i, imm: %i, destReg: %s, sourceReg1: %s, sourceReg2: %s, ", 
         inst.addr, inst.label, inst.type, inst.imm, inst.destReg->name, inst.source1Reg->name, inst.source2Reg->name);
-    printf("renamedDest: %s, renamedSource1: %s, renamedSource2: %s, branchTargetAddr: %i, branchTargetLabel: %s\n", 
-        physicalRegisterNameToString(inst.destPhysReg), physicalRegisterNameToString(inst.source1PhysReg), physicalRegisterNameToString(inst.source2PhysReg), 
-        inst.branchTargetAddr, inst.branchTargetLabel);
+    printf("renamedDest: %s, renamedSource1: %s, renamedSource2: %s, branchTargetLabel: %s\n", physicalRegisterNameToString(inst.destPhysReg), 
+        physicalRegisterNameToString(inst.source1PhysReg), physicalRegisterNameToString(inst.source2PhysReg), inst.branchTargetLabel);
 }
 
+// converts a given string into an arch register instance which is more easily compared
 ArchRegister *stringToArchRegister(char *s) {
 
     ArchRegister *reg = malloc(sizeof(ArchRegister));
@@ -196,13 +191,19 @@ ArchRegister *stringToArchRegister(char *s) {
         } else if (s[0] == 'F') {
             reg->regType = VALUE_TYPE_FLOAT;
         } else {
+            #ifdef ENABLE_DEBUG_LOG
             printf("error: could not create ArchRegister struct for the given input register: %s\n", s);
+            #endif
+
             free(reg);
             return NULL;
         }
 
         if (sscanf(s + 1, "%d", &reg->num) <= 0) {
+            #ifdef ENABLE_DEBUG_LOG
             printf("error: could not create ArchRegister struct for the given input register: '%s' due to an invalid\n", s);
+            #endif
+
             return NULL;
         }
     }
@@ -212,6 +213,5 @@ ArchRegister *stringToArchRegister(char *s) {
 
 // helper method which determines if two ArchRegister structs are equal
 int archRegistersAreEqual(ArchRegister *reg1, ArchRegister *reg2) {
-    printf("arch registers are equal: %p and %p\n", reg1, reg2);
     return reg1->regType == reg2->regType && reg1->num == reg2->num;
 }

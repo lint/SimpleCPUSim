@@ -8,13 +8,10 @@
 
 // initialize a INT functional unit struct
 void initLSFunctionalUnit(LSFunctionalUnit *lsFU, int latency) {
-
     lsFU->latency = latency;
     lsFU->stages = malloc(lsFU->latency * sizeof(LSFUResult *)); 
     lsFU->stages[0] = NULL;
     lsFU->isStalled = 0;
-    // lsFU->fuType = FU_TYPE_; // should i combine loads and stores into one???
-
 }
 
 // free any load/store functional unit elements that are stored on the heap
@@ -60,16 +57,17 @@ void flushLSFunctionalUnit(LSFunctionalUnit *lsFU) {
 // perform load/store functional unit operations over a cycle
 void cycleLSFunctionalUnit(LSFunctionalUnit *lsFU, StatusTables *statusTables) {
 
-    printf("\nperforming load/store functional unit operations...\n");
+    printf_DEBUG(("\nperforming load/store functional unit operations...\n"));
     
     if (lsFU->isStalled) {
-        printf("\tload/store functional unit is stalled because its result was not taken by the memory unit\n");
+        printf_DEBUG(("\tload/store functional unit is stalled because its result was not taken by the memory unit\n"));
         return;
     }
 
     ResStationStatusTable *resStationTable = statusTables->resStationTable;
     ROBStatusTable *robTable = statusTables->robTable;
 
+    // get load and store reservation stations
     ResStationStatusTableEntry **loadResStationEntries = resStationEntriesForFunctionalUnit(resStationTable, FU_TYPE_LOAD);
     ResStationStatusTableEntry **storeResStationEntries = resStationEntriesForFunctionalUnit(resStationTable, FU_TYPE_STORE);
     int numLoadEntries = numResStationsForFunctionalUnit(resStationTable, FU_TYPE_LOAD);
@@ -148,7 +146,8 @@ void cycleLSFunctionalUnit(LSFunctionalUnit *lsFU, StatusTables *statusTables) {
             exit(1);
         }
     } else {
-        printf("no reservation station entries found for LOAD/STORE functional unit\n");
+        printf_DEBUG(("no reservation station entries found for LOAD/STORE functional unit\n"));
+
         lsFU->stages[0] = NULL;
         return;
     }
@@ -164,7 +163,6 @@ void cycleLSFunctionalUnit(LSFunctionalUnit *lsFU, StatusTables *statusTables) {
     nextResult->resultAddr = nextResult->base + nextResult->offset;
     nextResult->destROB = resStationEntry->dest;
     nextResult->fuType = closestToHeadType;
-
 
     // move data through the stages of the functional unit by shifting elements of the stages array to the right
     // this does not do anything given the project design as the stages array is only one element, so it's commented out, but it's good to be general

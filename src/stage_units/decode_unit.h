@@ -29,41 +29,28 @@ typedef struct DecodeUnit {
     int numInstsInQueue;
     int NI;
     int NW;
-
-    // RegisterMappingNode **intRegMapTable;
-    // RegisterMappingNode **floatRegMapTable;
     RegisterMappingNode *freeList;
     MapTableEntry *mapTableHead;
 } DecodeUnit;
 
 // decode unit methods
-void initDecodeUnit(DecodeUnit *decodeUnit, int NF, int NI);
+void initDecodeUnit(DecodeUnit *decodeUnit, int NI, int NW);
 void teardownDecodeUnit(DecodeUnit *decodeUnit);
-// void extendDecodeUnitInputBufferIfNeeded(DecodeUnit *decodeUnit);
-// void setDecodeUnitInputBufferSize(DecodeUnit *decodeUnit, int newSize);
-void addInstructionToDecodeQueue(DecodeUnit *decodeUnit, LabelTable *labelTable, char *instBuf, int instAddr);
+void addInstructionToDecodeQueue(DecodeUnit *decodeUnit, LabelTable *labelTable, char *instStr, int instAddr);
 void printMapTable(DecodeUnit *decodeUnit);
 void printFreeList(DecodeUnit *decodeUnit);
 void printDecodeQueue(DecodeUnit *decodeUnit);
-// void printDecodeUnitInputBuffer(DecodeUnit *decodeUnit);
-// void printDecodeUnitOutputQueue(DecodeUnit *decodeUnit);
-//RegisterMappingNode *getFreePhysicalRegister(DecodeUnit *decodeUnit);
-RegisterMappingNode *getFreeRenameRegister(DecodeUnit *decodeUnit);
+int numFreePhysicalRegistersAvailable(DecodeUnit *decodeUnit);
+RegisterMappingNode *getFreePhysicalRegister(DecodeUnit *decodeUnit);
+MapTableEntry *mapTableEntryForRegister(DecodeUnit *decodeUnit, ArchRegister *reg);
+int physicalRegisterMappingForReg(DecodeUnit *decodeUnit, ArchRegister *reg); //returns PhysicalRegisterName
+void addPhysicalRegisterToMapTable(DecodeUnit *decodeUnit, RegisterMappingNode *physRegNode, ArchRegister *reg);
+int readMapTableForReg(DecodeUnit *decodeUnit, ArchRegister *reg); // returns PhysicalRegisterName
+int numPhysicalRegisterMappingsForReg(DecodeUnit *decodeUnit, ArchRegister *reg);
 RegisterMappingNode *getFreeListTailNode(DecodeUnit *decodeUnit);
 void popOldPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ROBStatusTable *robTable, ArchRegister *reg, int addToTail);
 void popNewPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ArchRegister *reg, int addToTail);
-//void addPhysicalRegisterToMapTable(DecodeUnit *decodeUnit, RegisterMappingNode *physRegNode, enum RegisterName reg);
-// void addRenameRegisterToIntMapTable(DecodeUnit *decodeUnit, RegisterMappingNode *renameRegNode, int reg); // reg = enum IntRegisterName
-// void addRenameRegisterToFloatMapTable(DecodeUnit *decodeUnit, RegisterMappingNode *renameRegNode, int reg); // reg = enum FloatRegisterName
-// enum PhysicalRegisterName readMapTable(DecodeUnit *decodeUnit, enum RegisterName reg);
-enum RenameRegisterName readIntMapTableForReg(DecodeUnit *decodeUnit, int reg); // reg = enum IntRegisterName
-enum RenameRegisterName readFloatMapTableForReg(DecodeUnit *decodeUnit, int reg); // reg = enum FloatRegisterName
+int numPhysicalRegistersNeededForInst(DecodeUnit *decodeUnit, Instruction *inst);
 int performRegisterRenamingForInst(DecodeUnit *decodeUnit, Instruction *inst);
 void cycleDecodeUnit(DecodeUnit *decodeUnit, FetchBufferEntry **fetchBuffer, int *numInstsInBuffer, StatusTables *statusTables, RegisterFile *regFile, StallStats *stallStats, LabelTable *labelTable);
-
-int numFreeRenameRegistersAvailable(DecodeUnit *decodeUnit);
 void flushDecodeQueue(DecodeUnit *decodeUnit);
-
-
-
-// TODO remove these methods and add the current ones..

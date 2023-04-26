@@ -18,11 +18,11 @@ typedef struct ResStationStatusTableEntry {
     float vkFloat;
     int vjIsAvailable;
     int vkIsAvailable;
-    int justGotOperandFromCDB;
+    int justGotOperandFromCDB; // boolean used to indiciate if a value was received from the CDB so it doesn't get used in the same cycle
     int qj; // ROB index containing source operand 1
     int qk; // ROB index containing source operand 2
     int dest; // the ROB index that will hold the result
-    int addr; // store address information for loads/stores/branches
+    int addr; // store base address information for loads/stores/branches
     int buOffset; // the offset stored in the BU instruction in order to calculate the effective address
 
 } ResStationStatusTableEntry;
@@ -30,6 +30,7 @@ typedef struct ResStationStatusTableEntry {
 // struct representing the reservation status table
 typedef struct ResStationStatusTable {
 
+    // have separate arrays for each functional unit (including 2 for the load/store unit)
     ResStationStatusTableEntry **intEntries;
     ResStationStatusTableEntry **loadEntries;
     ResStationStatusTableEntry **storeEntries;

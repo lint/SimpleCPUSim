@@ -4,13 +4,11 @@ typedef struct BUFUResult BUFUResult;
 typedef struct StatusTables StatusTables;
 
 typedef struct BUFunctionalUnit {
-
     BUFUResult **stages;
     int lastSelectedResStation;
     int latency;
     int fuType; // FunctionalUnitType enum
     int isStalled; // operations get stalled because the writeback unit could not write the result on the CDB
-
 } BUFunctionalUnit;
 
 // int functional unit methods

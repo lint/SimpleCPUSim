@@ -2,19 +2,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "bu_fu.h"
 #include "../status_tables/status_tables.h"
 #include "../misc/misc.h"
+#include "bu_fu.h"
 
 // initialize a BU functional unit struct
 void initBUFunctionalUnit(BUFunctionalUnit *buFU, int latency) {
-    
     buFU->latency = latency;
     buFU->lastSelectedResStation = -1;
-    buFU->stages = malloc(buFU->latency * sizeof(BUFUResult *)); 
-    buFU->stages[0] = NULL;
     buFU->fuType = FU_TYPE_BU;
     buFU->isStalled = 0;
+    buFU->stages = malloc(buFU->latency * sizeof(BUFUResult *)); 
+    buFU->stages[0] = NULL;
 }
 
 // free any elements of the BU functional unit that are stored on the heap
@@ -59,10 +58,10 @@ void flushBUFunctionalUnit(BUFunctionalUnit *buFU) {
 
 // perform BU functional unit operations over the course of a clock cycle
 void cycleBUFunctionalUnit(BUFunctionalUnit *buFU, StatusTables *statusTables) {
-    printf("\nperforming BU functional unit operations...\n");
+    printf_DEBUG(("\nperforming BU functional unit operations...\n"));
 
     if (buFU->isStalled) {
-        printf("\nBU functional unit is stalled because its result was not placed on the CDB by the writeback unit\n");
+        printf_DEBUG(("\nBU functional unit is stalled because its result was not placed on the CDB by the writeback unit\n"));
         return;
     }
 
@@ -91,8 +90,10 @@ void cycleBUFunctionalUnit(BUFunctionalUnit *buFU, StatusTables *statusTables) {
 
         // if both operands of the reservation station and the instruction's state is "issued" then it can be brought into the functional unit
         if (resStationEntry->busy && (resStationEntry->vjIsAvailable && resStationEntry->vkIsAvailable) && robEntry->state == INST_STATE_ISSUED) {
-
+            
+            #ifdef ENABLE_DEBUG_LOG
             printf("selecting reservation station: BU[%d] for execution\n", resStationEntry->resStationIndex);
+            #endif
             
             buFU->lastSelectedResStation = nextResStation;
 
@@ -111,7 +112,9 @@ void cycleBUFunctionalUnit(BUFunctionalUnit *buFU, StatusTables *statusTables) {
                 nextResult->isBranchTaken = 1;
                 nextResult->effAddr = resStationEntry->addr + resStationEntry->buOffset;
 
-                printf("\n\n\nresStation->addr: %i, buOffset: %i\n\n\n", resStationEntry->addr, resStationEntry->buOffset);
+                #ifdef ENABLE_DEBUG_LOG
+                printf("\nresStation->addr: %i, buOffset: %i\n", resStationEntry->addr, resStationEntry->buOffset);
+                #endif
 
             // do not take branch if operands are equal
             } else {
@@ -126,9 +129,11 @@ void cycleBUFunctionalUnit(BUFunctionalUnit *buFU, StatusTables *statusTables) {
         nextResStation = (nextResStation + 1) % numResStations;
     }
 
+    #ifdef ENABLE_DEBUG_LOG
     if (!nextResult) {
         printf("no reservation station found to start executing\n");
     }
+    #endif
 
     // move data through the stages of the functional unit by shifting elements of the stages array to the right
     // this does not do anything given the project design as the stages array is only one element, so it's commented out, but it's good to be general

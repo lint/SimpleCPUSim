@@ -2,13 +2,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "../misc/misc.h"
 #include "data_cache.h"
 
 // initialize a struct representing the data cache
 void initDataCache(DataCache *dataCache) {
-    printf("initalizing data cache...\n");
+    printf_DEBUG(("initalizing data cache...\n"));
+
     dataCache->cacheSize = DATA_CACHE_INITIAL_SIZE;
-    // dataCache->cache = calloc(DATA_CACHE_INITIAL_SIZE, 1);
     dataCache->cache = calloc(DATA_CACHE_INITIAL_SIZE, sizeof(float));
 }
 
@@ -38,62 +39,18 @@ void extendDataCacheIfNeeded(DataCache *dataCache, int address) {
         dataCache->cache = calloc(newSize, sizeof(float));
         memcpy(dataCache->cache, oldCache, oldSize);
         free(oldCache);
-
+        
+        #ifdef ENABLE_DEBUG_LOG
         printf("address '%d' is greater than the current data cache size '%d', extending to %d entries\n", address, oldSize, newSize);
+        #endif
     }
 }
-
-// // writes a byte to a certain address in the data cache
-// void writeByteToDataCache(DataCache *dataCache, int address, char byte) {
-
-//     if (address < 0) {
-//         printf("error: can't write to an address less than 0\n");
-//         return;
-//     }
-
-//     // check if requested address is outside current cache size
-//     extendDataCacheIfNeeded(dataCache, address);
-
-//     // write the byte to the cache
-//     dataCache->cache[address] = byte;
-// }
-
-// // retrieves a byte from a certain address in the data cache
-// char readByteFromDataCache(DataCache *dataCache, int address) {
-
-//     if (address < 0) {
-//         printf("error: can't read from an address less than 0\n");
-//         return '\0';
-//     }
-
-//     // check if requested address is outside current cache size
-//     extendDataCacheIfNeeded(dataCache, address);
-
-//     // read the byte from the cache and return it
-//     return dataCache->cache[address];
-// }
-
-// write an int value to the given address in the data cache
-// void writeIntToDataCache(DataCache *dataCache, int address, int value) {
-
-//     if (address < 0) {
-//         printf("error: can't write to an address less than 0\n");
-//         return;
-//     }
-
-//     // check if requested address is outside current cache size
-//     extendDataCacheIfNeeded(dataCache, address);
-
-//     // write the value to the entry
-//     return dataCache->cache[address]->intValue;
-
-// }
 
 // write a float to the given address in the data cache
 void writeFloatToDataCache(DataCache *dataCache, int address, float value) {
 
     if (address < 0) {
-        printf("error: can't write to an address less than 0\n");
+        printf_DEBUG(("error: can't write to an address less than 0\n"));
         return;
     }
 
@@ -108,8 +65,8 @@ void writeFloatToDataCache(DataCache *dataCache, int address, float value) {
 float readFloatFromDataCache(DataCache *dataCache, int address) {
 
     if (address < 0) {
-        printf("error: can't read from an address less than 0\n");
-        return '\0';
+        printf_DEBUG(("error: can't read from an address less than 0\n"));
+        return 0;
     }
 
     // check if requested address is outside current cache size
@@ -143,7 +100,6 @@ void printDataCache(DataCache *dataCache) {
 
     // print each full row of bytes
     for (int i = 0; i < dataCache->cacheSize / entriesPerRow; i++) {
-        //printf("0x%-3x", i);
         printf("%7d | ", i * entriesPerRow);
         for (int j = 0; j < entriesPerRow; j++) {
             printf("%7.1f", readFloatFromDataCache(dataCache, i * entriesPerRow + j));
@@ -155,7 +111,6 @@ void printDataCache(DataCache *dataCache) {
     if (dataCache->cacheSize % entriesPerRow != 0) {
         int lastRow = dataCache->cacheSize / entriesPerRow;
 
-        //printf("0x%-3x", i);
         printf("%7d", lastRow * entriesPerRow);
         for (int j = 0; j < dataCache->cacheSize % entriesPerRow; j++) {
             printf("%7.1f", readFloatFromDataCache(dataCache, lastRow * entriesPerRow + j));

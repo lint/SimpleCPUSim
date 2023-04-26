@@ -25,7 +25,6 @@ void initBranchPredictor(BranchPredictor *branchPredictor) {
 
 // free any elements of the branch predictor that are stored on the heap
 void teardownBranchPredictor(BranchPredictor *branchPredictor) {
-
     if (branchPredictor->btb) {
         for (int i = 0; i < branchPredictor->numBTBEntries; i++) {
             free(branchPredictor->btb[i]);
@@ -37,23 +36,12 @@ void teardownBranchPredictor(BranchPredictor *branchPredictor) {
 // updates the state of the branch predictor depending on if a branch was taken or not
 void updateBranchPredictor(BranchPredictor *branchPredictor, int branchWasCorrect) {
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("updating branch predictor state from: %s ", branchPredictionStateToString(branchPredictor->state));
+    #endif
     
     // branch was predicted correctly
     if (branchWasCorrect) {
-
-        // // strongly not taken -> weakly not taken
-        // if (branchPredictor->state == BRANCH_STATE_STRONGLY_NOT_TAKEN) {
-        //     branchPredictor->state = BRANCH_STATE_WEAKLY_NOT_TAKEN;
-        
-        // // weakly not taken -> weakly taken
-        // } else if (branchPredictor->state == BRANCH_STATE_WEAKLY_NOT_TAKEN) {
-        //     branchPredictor->state = BRANCH_STATE_WEAKLY_TAKEN;
-        
-        // // weakly taken -> strongly taken
-        // } else if (branchPredictor->state == BRANCH_STATE_WEAKLY_TAKEN) {
-        //     branchPredictor->state = BRANCH_STATE_STRONGLY_TAKEN;
-        // }
 
         // weakly not taken -> strongly not taken
         if (branchPredictor->state == BRANCH_STATE_WEAKLY_NOT_TAKEN) {
@@ -66,19 +54,6 @@ void updateBranchPredictor(BranchPredictor *branchPredictor, int branchWasCorrec
     
     // branch was not predicted correctly
     } else {
-
-        // // strongly taken -> weakly taken
-        // if (branchPredictor->state == BRANCH_STATE_STRONGLY_TAKEN) {
-        //     branchPredictor->state = BRANCH_STATE_WEAKLY_TAKEN;
-        
-        // // weakly taken -> weakly not taken
-        // } else if (branchPredictor->state == BRANCH_STATE_WEAKLY_TAKEN) {
-        //     branchPredictor->state = BRANCH_STATE_WEAKLY_NOT_TAKEN;
-        
-        // // weakly not taken -> strongly not taken
-        // } else if (branchPredictor->state == BRANCH_STATE_WEAKLY_NOT_TAKEN) {
-        //     branchPredictor->state = BRANCH_STATE_STRONGLY_NOT_TAKEN;
-        // }
 
         // strongly taken -> weakly taken
         if (branchPredictor->state == BRANCH_STATE_STRONGLY_TAKEN) {
@@ -98,7 +73,9 @@ void updateBranchPredictor(BranchPredictor *branchPredictor, int branchWasCorrec
         }
     }
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("to: %s\n", branchPredictionStateToString(branchPredictor->state));
+    #endif
 }
 
 // returns the BTB that a given PC hashes to
@@ -119,7 +96,9 @@ int shouldTakeBranch(BranchPredictor *branchPredictor) {
     } else if (branchPredictor->state == BRANCH_STATE_STRONGLY_NOT_TAKEN || branchPredictor->state == BRANCH_STATE_WEAKLY_NOT_TAKEN) {
         return 0;
     } else {
+        #ifdef ENABLE_DEBUG_LOG
         printf("error: branch predictor is in invalid state\n");
+        #endif
         return -1;
     }
 }
@@ -135,7 +114,9 @@ void updateBTBEntry(BranchPredictor *branchPredictor, int pc, int target) {
 // predict the next PC for a given PC
 int predictNextPC(BranchPredictor *branchPredictor, int pc) {
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("branch predictor getting next pc for given pc: %i\n", pc);
+    #endif
 
     // get the entry associated with the given pc
     BTBEntry *entry = getBTBEntryForPC(branchPredictor, pc);
@@ -146,16 +127,25 @@ int predictNextPC(BranchPredictor *branchPredictor, int pc) {
 
         // use 2-bit dynamic state to decide to take the branch or not
         if (shouldTakeBranch(branchPredictor)) {
+            #ifdef ENABLE_DEBUG_LOG
             printf("\tentry matches provided pc and predicted to take branch, returning new pc: %i\n", entry->target);
+            #endif
+
             return entry->target;
         } else {
+            #ifdef ENABLE_DEBUG_LOG
             printf("\tentry matches provided pc and predicted to take not branch, returning new pc: %i\n", pc + 4);
+            #endif
+
             return pc + 4;
         }
     
     // entry does not match the given pc (it's either a different branch or the entry has not been used before)
     } else {
+        #ifdef ENABLE_DEBUG_LOG
         printf("\tentry does not match provided pc, returning new pc: %i\n", pc + 4);
+        #endif
+        
         return pc + 4;
     }
 }

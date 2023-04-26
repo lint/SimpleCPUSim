@@ -55,4 +55,4 @@ void updateWritebackUnitWaitingForROB(WritebackUnit *writebackUnit, ResStationSt
 void cycleWritebackUnit(WritebackUnit *writebackUnit, FetchUnit *fetchUnit, DecodeUnit *decodeUnit, MemoryUnit *memUnit, StatusTables *statusTables, 
     FunctionalUnits *functionalUnits, RegisterFile *registerFile, DataCache *dataCache, BranchPredictor *branchPredictor);
 void printWritebackUnitROBInfo(WritebackUnit *writebackUnit);
-void printWritebackUnitCDBS(WritebackUnit *writebackUnit);
+void printWritebackUnitCDBs(WritebackUnit *writebackUnit);

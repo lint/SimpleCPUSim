@@ -10,7 +10,6 @@ void initROBStatusTable(ROBStatusTable *robTable, int NR) {
 
     robTable->NR = NR;
     robTable->headEntryIndex = 0;
-
     robTable->entries = malloc(NR * sizeof(ROBStatusTableEntry *));
 
     // create empty entries in the ROB table
@@ -47,6 +46,7 @@ void teardownROBStatusTable(ROBStatusTable *robTable) {
 // returns the index of the next available free slot in the ROB 
 int nextFreeROBEntryIndex(ROBStatusTable *robTable) {
 
+    // iterate over all entries in the ROB starting at the head
     for (int i = 0; i < robTable->NR; i++) {
         int index = (robTable->headEntryIndex + i) % robTable->NR;
         ROBStatusTableEntry *entry = robTable->entries[index];
@@ -67,6 +67,7 @@ int isFreeEntryInROB(ROBStatusTable *robTable) {
 // adds an instruction to the ROB and returns the ROB index that will contain the result
 int addInstToROB(ROBStatusTable *robTable, Instruction *inst) {
 
+    // this method assumes that ROB availablility was checked before it was called
     int robIndex = nextFreeROBEntryIndex(robTable);
     ROBStatusTableEntry *entry = robTable->entries[robIndex];
 
@@ -80,12 +81,15 @@ int addInstToROB(ROBStatusTable *robTable, Instruction *inst) {
     entry->addr = -1;
     entry->flushed = 0;
 
-    // TODO: also need to support address for store operations..............
-
+    // set the appriate values for the given instruction type
     enum InstructionType instType = inst->type;
+
+    // add values to ROB for int functional unit instructions
     if (instType == ADD || instType == ADDI || instType == SLT) {
         entry->instResultValueType = VALUE_TYPE_INT;
         entry->fuType = FU_TYPE_INT;
+
+    // add values to ROB for floating point instructions
     } else if (instType == FLD || instType == FSD || instType == FADD || instType == FSUB || instType == FMUL || instType == FDIV) {
         entry->instResultValueType = VALUE_TYPE_FLOAT;
 
@@ -101,14 +105,20 @@ int addInstToROB(ROBStatusTable *robTable, Instruction *inst) {
         } else if (instType == FDIV) {
             entry->fuType = FU_TYPE_FPDIV;
         }
+    
+    // add values to ROB for branch instruction
     } else if (instType == BNE) {
         entry->fuType = FU_TYPE_BU;
+    
+    // handle error case
     } else {
         entry->fuType = FU_TYPE_NONE;
         entry->instResultValueType = VALUE_TYPE_NONE;
     }
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("added instruction: %p to ROB entry: %i\n", inst, robIndex);
+    #endif
 
     return robIndex;
 }
@@ -150,7 +160,7 @@ int isROBEmpty(ROBStatusTable *robTable) {
 // sets busy = 0 for all entries in the ROB
 void flushROB(ROBStatusTable *robTable) {
 
-    printf("flushing ROB...\n");
+    printf_DEBUG(("flushing ROB...\n"));
 
     for (int i = 0; i < robTable->NR; i++) {
         ROBStatusTableEntry *entry = robTable->entries[i];
@@ -159,14 +169,10 @@ void flushROB(ROBStatusTable *robTable) {
             continue;
         }
         
-        // entry->state = INST_STATE_NONE;
-
         if (entry->busy) {
             entry->flushed = 1;
             entry->busy = 0;
         }
-        // robTable->entries[i]->busy = 0;
-        // TODO: clean up
     }
 }
 
@@ -191,9 +197,9 @@ int physicalRegWillBeWrittenBySomeROB(ROBStatusTable *robTable, enum PhysicalReg
         return 0;
     }
 
+    // iterative over ever ROB entry
     for (int i = 0; i < robTable->NR; i++) {
         ROBStatusTableEntry *entry = robTable->entries[i];
-
         if (entry->busy && entry->renamedDestReg == reg) {
             return 1;
         }

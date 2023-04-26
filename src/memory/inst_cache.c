@@ -7,7 +7,8 @@
 
 // initialize a struct representing the instruction cache
 void initInstCache(InstCache *instCache) {
-    printf("initalizing instruction cache...\n");
+    printf_DEBUG(("initalizing instruction cache...\n"));
+    
     instCache->numInsts = 0;
     instCache->cacheSize = INST_CACHE_INITIAL_SIZE;
     instCache->cache = calloc(INST_CACHE_INITIAL_SIZE, sizeof(char *));
@@ -37,7 +38,9 @@ void extendInstCacheIfNeeded(InstCache *instCache) {
         memcpy(instCache->cache, oldCache, oldSize * sizeof(char *));
         free(oldCache);
 
+        #ifdef ENABLE_DEBUG_LOG
         printf("extending instruction cache to %i entries\n", newSize);
+        #endif
     }
 }
 
@@ -46,7 +49,10 @@ char *readInstructionCache(InstCache *instCache, int address) {
     int index = address / 4; // since there are 4 bytes per instruction being simulated
 
     if (index < 0 || index >= instCache->numInsts) {
+        #ifdef ENABLE_DEBUG_LOG
         printf("error: attempted to read instruction at address '%d' (index '%d') which is out of bounds\n", address, index);
+        #endif
+
         return NULL;
     }
 
@@ -64,46 +70,7 @@ void addInstructionToCache(InstCache *instCache, char *instStr) {
     // store the instruction
     instCache->cache[instCache->numInsts++] = instStr;
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("added instruction: '%s' to cache\n", instStr);
-}
-
-// give each branch instruction the target address based on the label
-int resolveInstLabels(InstCache *instCache) {
-
-    // // iterate through every instruction
-    // for (int i = 0; i < instCache->numInsts; i++) {
-    //     Instruction *inst1 = &instCache->cache[i];
-        
-    //     // check if the instruction is a branch
-    //     if (inst1->type == BNE) {
-
-    //         int foundMatch = 0;
-
-    //         // check every other instruction
-    //         for (int j = 0; j < instCache->numInsts; j++) {
-    //             if (j == i) {
-    //                 continue;
-    //             }
-
-    //             Instruction *inst2 = &instCache->cache[j];
-
-    //             // check if labels match
-    //             if (!strcmp(inst1->branchTargetLabel, inst2->label)) {
-    //                 // printf("instruction: %i (address: %i) has the target label: %s matched by branch: %i\n", j, j * 4, inst2->label, i);
-
-    //                 inst1->branchTargetAddr = j * 4; // simulating instructions taking 4 bytes
-    //                 foundMatch = 1;
-    //                 break;
-    //             }
-    //         }
-
-    //         // return error if there is instruction that has the target label
-    //         if (!foundMatch) {
-    //             printf("error: branch could not find instruction with label: %s\n", inst1->branchTargetLabel);
-    //             return 1;
-    //         }
-    //     }
-    // }
-
-    return 0;
+    #endif
 }

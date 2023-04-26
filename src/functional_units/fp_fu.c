@@ -2,26 +2,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "fp_fu.h"
 #include "../status_tables/status_tables.h"
 #include "../misc/misc.h"
+#include "fp_fu.h"
 
 // initialize a floating point functional unit
 void initFPFunctionalUnit(FPFunctionalUnit *fpFU, enum FunctionalUnitType fuType, int latency) {
-    
     fpFU->latency = latency;
     fpFU->lastSelectedResStation = -1;
+    fpFU->fuType = fuType;
+    fpFU->isStalled = 0;
     fpFU->stages = malloc(fpFU->latency * sizeof(IntFUResult *)); 
     for (int i = 0; i < fpFU->latency; i++) {
         fpFU->stages[i] = NULL;
     }
-    fpFU->fuType = fuType;
-    fpFU->isStalled = 0;
 }
 
 // free any elements of a floating point functional unit that are stored on the heap
 void teardownFPFunctionalUnit(FPFunctionalUnit *fpFU) {
-
     if (fpFU->stages) {
         free(fpFU->stages);
     }
@@ -60,10 +58,15 @@ void flushFPFunctionalUnit(FPFunctionalUnit *fpFU) {
 
 // perform fp functional unit operations during a cycle
 void cycleFPFunctionalUnit(FPFunctionalUnit *fpFU, StatusTables *statusTables) {
+    #ifdef ENABLE_DEBUG_LOG
     printf("\nperforming fp functional unit (%s) operations...\n", fuTypeToString(fpFU->fuType));
+    #endif
 
     if (fpFU->isStalled) {
+        #ifdef ENABLE_DEBUG_LOG
         printf("\tfp functional unit (%s) is stalled because its result was not placed on the CDB by the writeback unit\n", fuTypeToString(fpFU->fuType));
+        #endif
+
         return;
     }
 
@@ -93,7 +96,9 @@ void cycleFPFunctionalUnit(FPFunctionalUnit *fpFU, StatusTables *statusTables) {
         // if both operands of the reservation station and the instruction's state is "issued" then it can be brought into the functional unit
         if (resStationEntry->busy && (resStationEntry->vjIsAvailable && resStationEntry->vkIsAvailable) && robEntry->state == INST_STATE_ISSUED) {
 
+            #ifdef ENABLE_DEBUG_LOG
             printf("selecting reservation station: %s[%d] for execution\n", fuTypeToString(fpFU->fuType), resStationEntry->resStationIndex);
+            #endif
             
             fpFU->lastSelectedResStation = nextResStation;
 
@@ -114,7 +119,9 @@ void cycleFPFunctionalUnit(FPFunctionalUnit *fpFU, StatusTables *statusTables) {
                 } else if (resStationEntry->op == FU_OP_SUB) {
                     nextResult->result = nextResult->source1 - nextResult->source2;    
                 } else {
+                    #ifdef ENABLE_DEBUG_LOG
                     printf("error: invalid operation type: %s for FPAdd functional unit\n", fuOpToString(resStationEntry->op));
+                    #endif
                 }
 
             } else if (fpFU->fuType == FU_TYPE_FPMUL) {
@@ -132,9 +139,11 @@ void cycleFPFunctionalUnit(FPFunctionalUnit *fpFU, StatusTables *statusTables) {
         nextResStation = (nextResStation + 1) % numResStations;
     }
 
+    #ifdef ENABLE_DEBUG_LOG
     if (!nextResult) {
         printf("no reservation station found to start executing\n");
     }
+    #endif
 
     // move data through the stages of the functional unit by shifting elements of the stages array to the right
     for (int i = fpFU->latency - 1; i >= 1; i--) {

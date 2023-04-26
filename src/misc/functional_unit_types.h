@@ -48,5 +48,4 @@ typedef struct FunctionalUnits {
     FPFunctionalUnit *fpDivFU;
     BUFunctionalUnit *buFU;
     LSFunctionalUnit *lsFU;
-
 } FunctionalUnits;

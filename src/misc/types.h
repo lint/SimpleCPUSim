@@ -9,6 +9,12 @@ typedef struct Params {
     int NB; // common data busses 
 } Params;
 
+// struct containing information about stall statistics
+typedef struct StallStats {
+    int fullROBStalls;
+    int fullResStationStalls;
+} StallStats;
+
 // struct representing an architectural register
 typedef struct ArchRegister {
     char name[8];
@@ -27,7 +33,6 @@ typedef struct Instruction {
     int destPhysReg; // enum PhysicalRegisterName
     int regsWereRenamed;
     int imm; // either the offset used in load/store instructions or an immediate for addi instructions
-    int branchTargetAddr; // TODO: remove this?
     char branchTargetLabel[256];
     char label[256];
     int addr; // address in the instruction cache

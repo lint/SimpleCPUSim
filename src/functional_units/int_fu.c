@@ -8,7 +8,6 @@
 
 // initialize a INT functional unit struct
 void initIntFunctionalUnit(IntFunctionalUnit *intFU, int latency) {
-
     intFU->latency = latency;
     intFU->lastSelectedResStation = -1;
     intFU->stages = malloc(intFU->latency * sizeof(IntFUResult *)); 
@@ -59,10 +58,10 @@ void flushIntFunctionalUnit(IntFunctionalUnit *intFU) {
 
 // perform INT functional unit operations during a cycle
 void cycleIntFunctionalUnit(IntFunctionalUnit *intFU, StatusTables *statusTables) {
-    printf("\nperforming int functional unit operations...\n");
+    printf_DEBUG(("\nperforming int functional unit operations...\n"));
 
     if (intFU->isStalled) {
-        printf("\tint functional unit is stalled because its result was not placed on the CDB by the writeback unit\n");
+        printf_DEBUG(("\tint functional unit is stalled because its result was not placed on the CDB by the writeback unit\n"));
         return;
     }
 
@@ -91,8 +90,10 @@ void cycleIntFunctionalUnit(IntFunctionalUnit *intFU, StatusTables *statusTables
 
         // if both operands of the reservation station and the instruction's state is "issued" then it can be brought into the functional unit
         if (resStationEntry->busy && (resStationEntry->vjIsAvailable && resStationEntry->vkIsAvailable) && robEntry->state == INST_STATE_ISSUED) {
-
+            
+            #ifdef ENABLE_DEBUG_LOG
             printf("selecting reservation station: INT[%d] for execution\n", resStationEntry->resStationIndex);
+            #endif
             
             intFU->lastSelectedResStation = nextResStation;
 
@@ -123,9 +124,11 @@ void cycleIntFunctionalUnit(IntFunctionalUnit *intFU, StatusTables *statusTables
         nextResStation = (nextResStation + 1) % numResStations;
     }
 
+    #ifdef ENABLE_DEBUG_LOG
     if (!nextResult) {
         printf("no reservation station found to start executing\n");
     }
+    #endif
 
     // move data through the stages of the functional unit by shifting elements of the stages array to the right
     // this does not do anything given the project design as the stages array is only one element, so it's commented out, but it's good to be general

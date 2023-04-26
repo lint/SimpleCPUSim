@@ -11,10 +11,6 @@ typedef struct DataCache {
 void initDataCache(DataCache *dataCache);
 void teardownDataCache(DataCache *dataCache);
 void extendDataCacheIfNeeded(DataCache *dataCache, int address);
-// void writeIntToDataCache(DataCache *dataCache, int address, int value);
 void writeFloatToDataCache(DataCache *dataCache, int address, float value);
-// int readIntFromDataCache(DataCache *dataCache, int address);
 float readFloatFromDataCache(DataCache *dataCache, int address);
-// void writeByteToDataCache(DataCache *dataCache, int address, char byte);
-// char readByteFromDataCache(DataCache *dataCache, int address);
 void printDataCache(DataCache *dataCache);

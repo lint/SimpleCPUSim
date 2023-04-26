@@ -26,8 +26,6 @@ void teardownRegisterStatusTable(RegisterStatusTable *regTable) {
 // gets the entry in the register status table for a given register
 RegisterStatusTableEntry *registerStatusTableEntryForReg(RegisterStatusTable *regTable, ArchRegister *reg) {
 
-    printRegisterStatusTable(regTable);
-
     RegisterStatusTableEntry *curr = regTable->headEntry;
 
     if (!curr || !reg) {
@@ -62,32 +60,28 @@ int getRegisterStatusTableEntryROBIndex(RegisterStatusTable *regTable, ArchRegis
 
 // sets the ROB index for a given register
 void setRegisterStatusTableEntryROBIndex(RegisterStatusTable *regTable, ArchRegister *reg, int robIndex) {
+    #ifdef ENABLE_DEBUG_LOG
     printf("set register status table int entry: %s to ROB index: %i\n", reg->name, robIndex);
+    #endif
 
     if (!reg) {
-        printf("\tdestination register is null, not setting register status table entry\n");
+        printf_DEBUG(("\tdestination register is null, not setting register status table entry\n"));
         return;
     }
 
-    printf("here5\n");
-
     RegisterStatusTableEntry *entry = registerStatusTableEntryForReg(regTable, reg);
-
-    printf("here6\n");
 
     // check if the entry exists, and create a new entry if not
     if (entry) {
         entry->robIndex = robIndex;
     } else {
-        printf("\tcreating new register status table entry\n");
         entry = malloc(sizeof(RegisterStatusTableEntry));
         entry->next = regTable->headEntry;
         entry->reg = reg;
         entry->robIndex = robIndex;
+
         regTable->headEntry = entry;
     }
-
-    printf("here8\n");
 }
 
 // prints the contents of the register status table
@@ -109,7 +103,7 @@ void printRegisterStatusTable(RegisterStatusTable *regTable) {
 
 // clears all the entries in the register status table
 void flushRegisterStatusTable(RegisterStatusTable *regTable) {
-    printf("clearing register status table\n");
+    printf_DEBUG(("clearing register status table\n"));
 
     RegisterStatusTableEntry *curr = regTable->headEntry;
 

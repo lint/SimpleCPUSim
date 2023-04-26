@@ -11,7 +11,7 @@
 // initialize the fetch unit struct
 void initFetchUnit(FetchUnit *fetchUnit, int NF) {
 
-    printf("initializing fetch unit...\n");
+    printf_DEBUG(("initializing fetch unit...\n"));
 
     fetchUnit->NF = NF;
     
@@ -39,7 +39,6 @@ void extendFetchUnitOutputBufferIfNeeded(FetchUnit *fetchUnit) {
     // only extend the buffer if it is full
     if (*fetchUnit->numInstsInBuffer == fetchUnit->fetchBufferSize) {
 
-
         // get old values
         FetchBufferEntry **oldBuffer = fetchUnit->fetchBuffer;
         int oldSize = fetchUnit->fetchBufferSize;
@@ -53,13 +52,13 @@ void extendFetchUnitOutputBufferIfNeeded(FetchUnit *fetchUnit) {
             fetchUnit->fetchBuffer[i] = NULL;
         }
 
+        #ifdef ENABLE_DEBUG_LOG
         printf("extending fetch unit output buffer to %i entries\n", newSize);
-        
         for (int i = 0; i < newSize; i++) {
             printf("buffer entry: %p\n", fetchUnit->fetchBuffer[i]);
         }
-
         printf("fetchBuffer: %p\n", fetchUnit->fetchBuffer);
+        #endif
     }
 }
 
@@ -67,36 +66,20 @@ void extendFetchUnitOutputBufferIfNeeded(FetchUnit *fetchUnit) {
 void addInstToFetchUnitOutputBuffer(FetchUnit *fetchUnit, char *instStr, int instAddr) {
     extendFetchUnitOutputBufferIfNeeded(fetchUnit);
 
-        printf("here\n");
-
-
     FetchBufferEntry *entry = malloc(sizeof(FetchBufferEntry));
     entry->instAddr = instAddr;
     entry->instStr = instStr;
 
-        printf("here2\n");
-
-    printf("numInstsInBuffer: %i\n", *fetchUnit->numInstsInBuffer);
-    printf("fetchBufferSize: %i\n", fetchUnit->fetchBufferSize);
-
-    printf("entry: %p\n", entry);
-
-    for (int i = 0; i < fetchUnit->fetchBufferSize; i++) {
-        printf("curr entries: %p", fetchUnit->fetchBuffer[i]);
-    }
-
-
     fetchUnit->fetchBuffer[(*fetchUnit->numInstsInBuffer)++] = entry;
 
-        printf("here3\n");
-
-
+    #ifdef ENABLE_DEBUG_LOG
     printf("added instruction: '%s' addr: '%i' to fetch buffer, numInstsInBuffer: %i\n", instStr, instAddr, *fetchUnit->numInstsInBuffer);
+    #endif
 }
 
 // remove all entries in the fetch buffer
 void flushFetchBuffer(FetchUnit *fetchUnit) {
-    // clear fetch buffer
+    
     for (int i = 0; i < *fetchUnit->numInstsInBuffer; i++) {
         fetchUnit->fetchBuffer[i] = NULL;
     }
@@ -105,7 +88,7 @@ void flushFetchBuffer(FetchUnit *fetchUnit) {
 
 // helper method to print the contents of the instruction fetch buffer
 void printInstructionFetchBuffer(FetchUnit *fetchUnit) {
-
+    
     printf("instruction fetch buffer: %p, size: %i, numInsts: %i, items: ", fetchUnit->fetchBuffer, fetchUnit->fetchBufferSize, *fetchUnit->numInstsInBuffer);
     
     for (int i = 0; i < *fetchUnit->numInstsInBuffer; i++) {
@@ -118,7 +101,7 @@ void printInstructionFetchBuffer(FetchUnit *fetchUnit) {
 // execute fetch unit's operations during a clock cycle
 void cycleFetchUnit(FetchUnit *fetchUnit, RegisterFile *registerFile, InstCache *instCache, BranchPredictor *branchPredictor) {
 
-    printf("\nperforming fetch unit operations...\n");
+    printf_DEBUG(("\nperforming fetch unit operations...\n"));
 
     // get the current value of PC
     int pcVal = readRegisterFileInt(registerFile, PHYS_REG_PC);
@@ -129,7 +112,7 @@ void cycleFetchUnit(FetchUnit *fetchUnit, RegisterFile *registerFile, InstCache 
         // get the instruction from the instruction cache
         char *instStr = readInstructionCache(instCache, pcVal);
         if (!instStr) {
-            printf("could not get instruction from cache\n");
+            printf_DEBUG(("could not get instruction from cache\n"));
             break;
         }
 
@@ -142,9 +125,4 @@ void cycleFetchUnit(FetchUnit *fetchUnit, RegisterFile *registerFile, InstCache 
     
     // update the new value of PC in the register file
     writeRegisterFileInt(registerFile, PHYS_REG_PC, pcVal);
-
-    // printf("instructions in fetch unit output buffer: \n");
-    // for (int i = 0; i < fetchUnit->numInstsInBuffer; i++) {
-    //     printInstruction(*(fetchUnit->outputBuffer[i]));
-    // }
  }

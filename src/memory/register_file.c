@@ -18,8 +18,7 @@ void initRegisterFile(RegisterFile *registerFile) {
         entry->intVal = 0;
         entry->valueType = VALUE_TYPE_NONE;
 
-        registerFile->physicalRegisters[i] = entry;
-        
+        registerFile->physicalRegisters[i] = entry;   
     }
 }
 
@@ -53,7 +52,9 @@ int readRegisterFileInt(RegisterFile *registerFile, enum PhysicalRegisterName re
     RegisterFileEntry *entry = registerFile->physicalRegisters[reg];
     entry->valueType = VALUE_TYPE_INT;
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("read register: %s, int: %i\n", physicalRegisterNameToString(reg), entry->intVal);
+    #endif
 
     return entry->intVal;
 }
@@ -73,8 +74,10 @@ float readRegisterFileFloat(RegisterFile *registerFile, enum PhysicalRegisterNam
     // return the value of the register
     RegisterFileEntry *entry = registerFile->physicalRegisters[reg];
     entry->valueType = VALUE_TYPE_FLOAT;
-
+    
+    #ifdef ENABLE_DEBUG_LOG
     printf("read register: %s, float: %f\n", physicalRegisterNameToString(reg), entry->floatVal);
+    #endif
 
     return entry->floatVal;
 }
@@ -96,7 +99,9 @@ void writeRegisterFileInt(RegisterFile *registerFile, enum PhysicalRegisterName 
         exit(1);
     }
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("\nwriting int: %i to register: %s\n", value, physicalRegisterNameToString(reg));
+    #endif
 
     // write the value to the register
     RegisterFileEntry *entry = registerFile->physicalRegisters[reg];
@@ -121,7 +126,9 @@ void writeRegisterFileFloat(RegisterFile *registerFile, enum PhysicalRegisterNam
         exit(1);
     }
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("\nwriting float: %f to register: %s\n", value, physicalRegisterNameToString(reg));
+    #endif
 
     // write the value to the register
     RegisterFileEntry *entry = registerFile->physicalRegisters[reg];

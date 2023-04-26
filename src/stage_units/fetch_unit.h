@@ -7,7 +7,6 @@ typedef struct FetchBufferEntry FetchBufferEntry;
 
 // struct representing a fetch unit
 typedef struct FetchUnit {
-    // char **fetchBuffer;
     FetchBufferEntry **fetchBuffer;
     int *numInstsInBuffer;
     int fetchBufferSize;

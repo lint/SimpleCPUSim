@@ -16,4 +16,3 @@ void teardownInstCache(InstCache *instCache);
 void extendInstCacheIfNeeded(InstCache *instCache);
 char *readInstructionCache(InstCache *instCache, int address);
 void addInstructionToCache(InstCache *instCache, char *instStr);
-int resolveInstLabels(InstCache *instCache);

@@ -1,18 +1,16 @@
 
-// struct which contains both a float and int value to store speculative results
+// struct which contains both a float and int value to store speculative and real results
 typedef struct RegisterFileEntry {
     int intVal;
     float floatVal;
-    int valueType; // enum ValueType in types.h // TODO: do i even need this?
+    int valueType; // enum ValueType (only used for printing)
 } RegisterFileEntry;
 
 // struct representing the register file
 typedef struct RegisterFile {
-
     RegisterFileEntry **physicalRegisters;
     int numPhysicalRegisters;
     int pc;
-
 } RegisterFile;
 
 // register file methods

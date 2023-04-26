@@ -25,8 +25,7 @@ enum ValueType {
 enum ValueProducedBy {
     VALUE_FROM_NONE = -1,
     VALUE_FROM_ROB,
-    VALUE_FROM_FU,
-    VALUE_FROM_MEM_UNIT
+    VALUE_FROM_FU
 };
 
 // enum representing the different types of possible architectural registers

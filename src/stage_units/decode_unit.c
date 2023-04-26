@@ -17,10 +17,7 @@ void initDecodeUnit(DecodeUnit *decodeUnit, int NI, int NW) {
     decodeUnit->decodeQueue = calloc(decodeUnit->NI, sizeof(Instruction *));
     decodeUnit->numInstsInQueue = 0;
 
-    // initialize map table
-    // decodeUnit->intRegMapTable = calloc(INT_REG_SIZE, sizeof(RegisterMappingNode *));
-    // decodeUnit->floatRegMapTable = calloc(FLOAT_REG_SIZE, sizeof(RegisterMappingNode *));
-
+    // initialize map table (linked list of linked lists)
     decodeUnit->mapTableHead = NULL;
 
     // initialize free list
@@ -88,7 +85,6 @@ void addInstructionToDecodeQueue(DecodeUnit *decodeUnit, LabelTable *labelTable,
     inst->imm = 0;
     inst->label[0] = '\0';
     inst->branchTargetLabel[0] = '\0';
-    inst->branchTargetAddr = 0;
     inst->regsWereRenamed = 0;
     inst->addr = instAddr;
 
@@ -97,7 +93,9 @@ void addInstructionToDecodeQueue(DecodeUnit *decodeUnit, LabelTable *labelTable,
     strcpy(instBuf, instStr);
     strcpy(inst->fullStr, instStr);
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("inst: %s\n", inst->fullStr);
+    #endif
 
     // get the first token of the line
     char *cur = strtok(instBuf, " \n\t,");
@@ -108,7 +106,6 @@ void addInstructionToDecodeQueue(DecodeUnit *decodeUnit, LabelTable *labelTable,
 
     // the first token containing a colon indicates it is a label
     if (strstr(cur, ":")) {
-        // printf("found label: %s\n", cur);
         
         memcpy(inst->label, cur, strlen(cur)-1);
         inst->label[strlen(cur)-1] = '\0';
@@ -184,11 +181,11 @@ void addInstructionToDecodeQueue(DecodeUnit *decodeUnit, LabelTable *labelTable,
         inst->branchTargetLabel[strlen(targetLabel)] = '\0';
 
         // branch instructions store the pc offset to the target instruction in the imm field (in real implementations this is encoded in instruction already)
-        // TODO: 
         inst->imm = getAddressForLabel(labelTable, inst->branchTargetLabel) - inst->addr;
-        // inst->imm = getAddressForLabel(labelTable, inst->branchTargetLabel);
 
+        #ifdef ENABLE_DEBUG_LOG
         printf("\n\n\ngetAddressForLabel: %i, inst->addr: %i\n\n\n", getAddressForLabel(labelTable, inst->branchTargetLabel), inst->addr);
+        #endif
 
         if (!targetLabel) {
             printf("error: invalid target label in instruction: '%s'\n", instBuf);
@@ -203,13 +200,17 @@ void addInstructionToDecodeQueue(DecodeUnit *decodeUnit, LabelTable *labelTable,
         exit(1);
     }
 
+    // add the instruction to the decode queue
     decodeUnit->decodeQueue[decodeUnit->numInstsInQueue++] = inst;
+
+    #ifdef ENABLE_DEBUG_LOG
     printf("added instruction: %p to decode queue, numInstsInQueue: %i\n", inst, decodeUnit->numInstsInQueue);
+    #endif
 }
 
 // prints the current state of the map table
 void printMapTable(DecodeUnit *decodeUnit) {
-
+    
     printf("map table:\n");
 
     MapTableEntry *currMapTableEntry = decodeUnit->mapTableHead;
@@ -260,7 +261,6 @@ void printDecodeQueue(DecodeUnit *decodeUnit) {
 
     for (int i = 0; i < decodeUnit->numInstsInQueue; i++) {
         printf("%p, ", decodeUnit->decodeQueue[i]);
-        //printInstruction(*decodeUnit->instDecodeQueue[i]);
     }
 
     printf("\n");
@@ -288,15 +288,21 @@ RegisterMappingNode *getFreePhysicalRegister(DecodeUnit *decodeUnit) {
     // get the free rename register which is at the head of the free list
     RegisterMappingNode *freeRenameReg = decodeUnit->freeList;
     if (freeRenameReg) {
+        #ifdef ENABLE_DEBUG_LOG
         printf("got free register: %s\n", physicalRegisterNameToString(freeRenameReg->reg));
+        #endif
         
         // remove the register from the free list
         decodeUnit->freeList = freeRenameReg->next;
         freeRenameReg->next = NULL;
         return freeRenameReg;
 
+    // could not allocated physical register
     } else {
+        #ifdef ENABLE_DEBUG_LOG
         printf("error: could not allocate physical register\n");
+        #endif
+
         return NULL;
     }
 }
@@ -310,17 +316,11 @@ MapTableEntry *mapTableEntryForRegister(DecodeUnit *decodeUnit, ArchRegister *re
         return NULL;
     }
 
-    printf("map tbale entry for reg: %s\n", reg->name);
-
     // loop through all entries in the map table
     while (curr) { 
 
-        printf("curr: %p\n", curr);
-
         // check if the current map table entry matches the given register details
         if (archRegistersAreEqual(reg, curr->reg)) {
-
-            printf("here\n");
             return curr;
         }
         curr = curr->next;
@@ -344,7 +344,9 @@ enum PhysicalRegisterName physicalRegisterMappingForReg(DecodeUnit *decodeUnit, 
 // adds a free physical register node to the map table for a given register
 void addPhysicalRegisterToMapTable(DecodeUnit *decodeUnit, RegisterMappingNode *physRegNode, ArchRegister *reg) {
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("add physical register: %s to map table for: %s\n", physicalRegisterNameToString(physRegNode->reg), reg->name);
+    #endif
 
     MapTableEntry *mapTableEntry = mapTableEntryForRegister(decodeUnit, reg);
 
@@ -356,6 +358,7 @@ void addPhysicalRegisterToMapTable(DecodeUnit *decodeUnit, RegisterMappingNode *
         decodeUnit->mapTableHead = mapTableEntry;
     }
 
+    // add it to the map table
     RegisterMappingNode *regMapHead = mapTableEntry->mapHead;
     physRegNode->next = regMapHead;
     mapTableEntry->mapHead = physRegNode;
@@ -364,7 +367,9 @@ void addPhysicalRegisterToMapTable(DecodeUnit *decodeUnit, RegisterMappingNode *
 // gets the rename register currently mapped to a given register
 enum PhysicalRegisterName readMapTableForReg(DecodeUnit *decodeUnit, ArchRegister *reg) {
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("read map table for reg: %s\n", reg->name);
+    #endif
 
     // check if trying to get mapping for PC or $0
     if (reg->regType == ARCH_REG_PC) {
@@ -375,13 +380,7 @@ enum PhysicalRegisterName readMapTableForReg(DecodeUnit *decodeUnit, ArchRegiste
     
     MapTableEntry *entry = mapTableEntryForRegister(decodeUnit, reg);
 
-    printf("here2\n");
-
     if (entry) {
-        printf("about to do it\n");
-        printf("entry: %p\n", entry);
-        printf("entry->maphead: %p\n", entry->mapHead);
-
         return entry->mapHead->reg;
     } else {
         return PHYS_REG_NONE;
@@ -428,24 +427,27 @@ RegisterMappingNode *getFreeListTailNode(DecodeUnit *decodeUnit) {
 // removes the oldest physical register in the map table for a given register and adds it back to the free list
 void popOldPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ROBStatusTable *robTable, ArchRegister *reg, int addToTail) {
 
+    #ifdef ENABLE_DEBUG_LOG
     printMapTable(decodeUnit);
+    #endif
 
     MapTableEntry *entry = mapTableEntryForRegister(decodeUnit, reg);
 
     if (!entry) {
+        #ifdef ENABLE_DEBUG_LOG
         printf("error: tried to pop oldest physical register mapping for reg: %s which does not have a map table entry\n", reg->name);
+        #endif
+        
         return;
     }
 
+    // do not pop regiseter if there is only one or zero in the map table
     int numMappings = numPhysicalRegisterMappingsForReg(decodeUnit, reg);
-
-    // do not try to pop mapping if there are no older mappings (also ensures that the first curr->next below exists)
-    // don't pop if only one mapping OR if the oldest one is the only committed value?
-    // need to check if all mappings except for the oldest one have been committed
-    // when you go through the mapping list check the ROB status table to see if a busy rob will write to it and if so, increment a counter
-    // if that counter = numMappings - 1, then don't pop the oldest value
     if (numMappings <= 1) {
+        #ifdef ENABLE_DEBUG_LOG
         printf("error: tried to pop a mapping for reg: %s but there are no older mappings\n", reg->name);
+        #endif
+
         return;
     }
 
@@ -466,7 +468,10 @@ void popOldPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ROBStatusTable 
 
     // don't pop if there is only one committed mapping
     if (numNewWritesToReg == numMappings - 1) {
+        #ifdef ENABLE_DEBUG_LOG
         printf("error: tried to pop a mapping for reg: %s but there is only one committed physical register\n", reg->name);
+        #endif
+
         return;
     }
 
@@ -477,7 +482,9 @@ void popOldPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ROBStatusTable 
     if (addToTail) {
         RegisterMappingNode *freeListTail = getFreeListTailNode(decodeUnit);
 
+        #ifdef ENABLE_DEBUG_LOG
         printf("adding physical register: %s to the end of the free list\n", physicalRegisterNameToString(curr->reg));
+        #endif
 
         // add the physical register node to the end of the free list
         if (freeListTail) {
@@ -505,33 +512,15 @@ void popNewPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ArchRegister *r
         return;
     }
 
-    // int numMappings = numPhysicalRegisterMappingsForReg(decodeUnit, reg);
-
-    // // do not try to pop mapping if there are no older mappings (also ensures that the first curr->next below exists)
-    // if (numMappings <= 1) {
-    //     printf("error: tried to pop a mapping for reg: %s but there are no older mappings\n", reg->name);
-    //     return;
-    // }
-
-    // get the oldest mapping for the register
-    // RegisterMappingNode *curr = entry->mapHead;
-    // RegisterMappingNode *prev = NULL;
-    // while (curr->next) {
-    //     prev = curr;
-    //     curr = curr->next;
-    // }
-
-    // // remove the last node from the mapping list
-    // prev->next = NULL;
-
     RegisterMappingNode *poppedNode = entry->mapHead;
     
+    #ifdef ENABLE_DEBUG_LOG
     if (!poppedNode) {
         printf("error: tried to pop newest node for register: %s but it does not exist\n", reg->name);
     } else {
         printf("popping mapping: %s from map table for: %s\n", physicalRegisterNameToString(poppedNode->reg), reg->name);
     }
-
+    #endif
 
     entry->mapHead = poppedNode->next;
     poppedNode->next = NULL;
@@ -540,7 +529,9 @@ void popNewPhysicalRegisterMappingForReg(DecodeUnit *decodeUnit, ArchRegister *r
     if (addToTail) {
         RegisterMappingNode *freeListTail = getFreeListTailNode(decodeUnit);
 
+        #ifdef ENABLE_DEBUG_LOG
         printf("adding physical register: %s to the end of the free list\n", physicalRegisterNameToString(poppedNode->reg));
+        #endif
 
         // add the physical register node to the end of the free list
         if (freeListTail) {
@@ -613,7 +604,9 @@ int numPhysicalRegistersNeededForInst(DecodeUnit *decodeUnit, Instruction *inst)
             numNeeded++;
         }
     } else {
+        #ifdef ENABLE_DEBUG_LOG
         printf("error: could not match instruction type during register renaming, this should never happen\n");
+        #endif
     }
 
     return numNeeded;
@@ -622,8 +615,6 @@ int numPhysicalRegistersNeededForInst(DecodeUnit *decodeUnit, Instruction *inst)
 // rename architectural registers to physical registers for a given instruction. returns 1 if renaming was successful, 0 if not
 int performRegisterRenamingForInst(DecodeUnit *decodeUnit, Instruction *inst) {
 
-    printf("do register renaming\n");
-
     int numPhysRegsAvailable = numFreePhysicalRegistersAvailable(decodeUnit);
     int numNewPhysRegsNeeded = numPhysicalRegistersNeededForInst(decodeUnit, inst);
 
@@ -631,11 +622,7 @@ int performRegisterRenamingForInst(DecodeUnit *decodeUnit, Instruction *inst) {
     if (numPhysRegsAvailable < numNewPhysRegsNeeded) {
         return 0;
     }
-
-    printf("type check: %s\n", inst->fullStr);
     
-    // rename registers for each type of instruction
-    // if (inst->type == FLD || inst->type == ADDI) {
     if (inst->type == ADDI) {
 
         // get source register mapping
@@ -694,8 +681,6 @@ int performRegisterRenamingForInst(DecodeUnit *decodeUnit, Instruction *inst) {
         }
         inst->source2PhysReg = source2PhysReg;
 
-        // TODO: same as BNE?
-
     } else if (inst->type == ADD || inst->type == SLT || inst->type == FADD || inst->type == FSUB || inst->type == FMUL || inst->type == FDIV) {
 
         // get source register mappings
@@ -724,14 +709,10 @@ int performRegisterRenamingForInst(DecodeUnit *decodeUnit, Instruction *inst) {
         inst->destPhysReg = destFreeNode->reg;
 
     } else if (inst->type == BNE) {
-
-        printf("checking BNE\n");
         
         // get source register mappings
         enum PhysicalRegisterName source1PhysReg = readMapTableForReg(decodeUnit, inst->source1Reg);
         enum PhysicalRegisterName source2PhysReg = readMapTableForReg(decodeUnit, inst->source2Reg);
-
-        printf("got mappings\n");
 
         // check if source1 register doesn't have a mapping
         if (source1PhysReg == PHYS_REG_NONE) {
@@ -750,7 +731,9 @@ int performRegisterRenamingForInst(DecodeUnit *decodeUnit, Instruction *inst) {
         inst->source2PhysReg = source2PhysReg;
 
     } else {
+        #ifdef ENABLE_DEBUG_LOG
         printf("error: could not match instruction type during register renaming, this should never happen\n");
+        #endif
     }
 
     inst->regsWereRenamed = 1;
@@ -761,9 +744,9 @@ int performRegisterRenamingForInst(DecodeUnit *decodeUnit, Instruction *inst) {
 // execute decode unit's operations during a clock cycle
 void cycleDecodeUnit(DecodeUnit *decodeUnit, FetchBufferEntry **fetchBuffer, int *numInstsInBuffer, StatusTables *statusTables, RegisterFile *regFile, StallStats *stallStats, LabelTable *labelTable) {
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("\nperforming decode unit operations...\n");
-    printf("test: %p\n", numInstsInBuffer);
-    printf("num insts in buffer: %i\n", *numInstsInBuffer);
+    #endif
 
     ROBStatusTable *robTable = statusTables->robTable;
     ResStationStatusTable *resStationTable = statusTables->resStationTable;
@@ -771,28 +754,14 @@ void cycleDecodeUnit(DecodeUnit *decodeUnit, FetchBufferEntry **fetchBuffer, int
 
     int numInstsMovedToQueue = 0;
 
-    // printf("numInstsInBuffer: %i, bufferSize: %i\n", *decodeUnit->numInstsInBuffer, *decodeUnit->fetchBufferSize);
-    printf("numInstsInBuffer: %i\n", *numInstsInBuffer);
-
-    for (int i = 0; i < *numInstsInBuffer; i++) {
-        printf("fetch buffer entry: %p\n", fetchBuffer[i]);
-    }
-
-    printf("fetch buffer: %p\n", fetchBuffer);
-
     // loop through all instructions in the input buffer
     for (int i = 0; i < *numInstsInBuffer; i++) {
         FetchBufferEntry *entry = fetchBuffer[i];
-
-        printf("entry: %p\n", entry);
 
         if (!entry) {
             printf("error: was unable to get instruction from decode input buffer when expected\n");
             exit(1);
         }
-
-        printf("here1\n");
-        printf("entry->instStr: %d\n", entry->instAddr);
 
         // attempt to add instruction to the decode queue
         if (decodeUnit->numInstsInQueue < decodeUnit->NI) {
@@ -804,7 +773,9 @@ void cycleDecodeUnit(DecodeUnit *decodeUnit, FetchBufferEntry **fetchBuffer, int
         }
     }
 
+    #ifdef ENABLE_DEBUG_LOG
     printf("numInstsInQueue: %i\n", decodeUnit->numInstsInQueue);
+    #endif
 
     // remove instructions from fetch buffer that were moved to the decode queue
     if (numInstsMovedToQueue > 0) {
@@ -818,10 +789,14 @@ void cycleDecodeUnit(DecodeUnit *decodeUnit, FetchBufferEntry **fetchBuffer, int
 
     // check if there are any instructions in the decode queue
     if (decodeUnit->numInstsInQueue == 0) {
+        #ifdef ENABLE_DEBUG_LOG
         printf("no instructions in decode queue\n");
+        #endif
+
         return;
     }
 
+    /* previous attempt to try to continuously rename registers, it is currently done at instruction issue */
     // printf("attempting to rename instructions...\n");
 
     // attempt to rename registers for instructions in the decode queue
@@ -845,71 +820,72 @@ void cycleDecodeUnit(DecodeUnit *decodeUnit, FetchBufferEntry **fetchBuffer, int
     //     }
     // }
 
+    #ifdef ENABLE_DEBUG_LOG
     printMapTable(decodeUnit);
+    printf("attempting to issue instructions...\n");
+    #endif
 
     int numInstsIssued = 0;
-
-    printf("attempting to issue instructions...\n");
 
     // attempt to issue up to NW instructions 
     for (int i = 0; i < decodeUnit->NW && numInstsIssued < decodeUnit->numInstsInQueue; i++) {
 
-        printf("attempting\n");
 
         Instruction *inst = decodeUnit->decodeQueue[i];
         enum InstructionType instType = inst->type;
 
+        /* leftover from previous attempt to continuously rename registers */
         // stop issuing if the registers were not renamed
         // if (!inst->regsWereRenamed) {
         //     printf("could not issue next instruction: %p as it has not gone through register renaming yet\n", inst);
         //     break;
         // }
-        printf("after get inst from queue: %s\n", inst->fullStr);
 
         // issue instruction if free slot in ROB and reservation station is available
         if (isFreeEntryInROB(robTable) && isFreeResStationForInstruction(resStationTable, inst)) {
-
-            printf("will allocate\n");
             
             int renamingWasSuccessful = performRegisterRenamingForInst(decodeUnit, inst);
             if (!renamingWasSuccessful) {
+                #ifdef ENABLE_DEBUG_LOG
                 printf("could not issue next instruction: %p as it has not gone through register renaming yet\n", inst);
+                #endif
+
                 break;
             }
             
             numInstsIssued++;
-            printInstruction(*inst);
 
+            #ifdef ENABLE_DEBUG_LOG
+            printInstruction(*inst);
             printf("renaming was successful\n");
-            
+            #endif
+
             // add entry in the ROB for the given instruction and get the index it is stored at
             int robIndex = addInstToROB(robTable, inst);
 
             // add the values to the reservation station (just updating the reservation station table)
             addInstToResStation(resStationTable, regTable, regFile, inst, robIndex);
 
-            // update the register status table to have the destination of the instruction
-            // if (instType == ADDI || instType == ADD || instType == SLT) {
-            //     setRegisterStatusTableIntEntryVal(regTable, inst->destReg, robIndex);
-            // } else if (instType == FADD || instType == FSUB || instType == FMUL || instType == FDIV || instType == FLD) {
-            //     setRegisterStatusTableFloatEntryVal(regTable, inst->destReg, robIndex);
-            // }
-            // TODO: remove this
             // store destination register is handled by this function as well
             setRegisterStatusTableEntryROBIndex(regTable, inst->destReg, robIndex);
 
         } else {
 
-
             // check if failure to issue was caused by the ROB being full
             if (!isFreeEntryInROB(robTable)) {
                 stallStats->fullROBStalls++;
+
+                #ifdef ENABLE_DEBUG_LOG
                 printf("encountered stall in issue unit due to ROB being full, fullROBStalls: %i\n", stallStats->fullROBStalls);
+                #endif
             
             // check if the failure to issue was caused by no reservation stations being available
             } else if (!isFreeResStationForInstruction(resStationTable, inst)) {
                 stallStats->fullResStationStalls++;
+
+                #ifdef ENABLE_DEBUG_LOG
                 printf("encountered stall in issue unit due to reservation stations needed by the instruction being full, fullResStationStalls: %i\n", stallStats->fullResStationStalls);
+                #endif
             }
 
             break;
@@ -918,7 +894,7 @@ void cycleDecodeUnit(DecodeUnit *decodeUnit, FetchBufferEntry **fetchBuffer, int
 
     // remove issued instructions from the decode queue
     if (numInstsIssued > 0) {
-        printf("removing instructions from decode queue\n");
+        printf_DEBUG(("removing instructions from decode queue\n"));
 
         for (int i = numInstsIssued; i < decodeUnit->numInstsInQueue; i++) {
             decodeUnit->decodeQueue[i - numInstsIssued] = decodeUnit->decodeQueue[i];
@@ -935,7 +911,6 @@ void flushDecodeQueue(DecodeUnit *decodeUnit) {
     // clear decode queue
     for (int i = 0; i < decodeUnit->numInstsInQueue; i++) {
         decodeUnit->decodeQueue[i] = NULL;
-        // TODO: free instruction?
     }
     decodeUnit->numInstsInQueue = 0;
 }

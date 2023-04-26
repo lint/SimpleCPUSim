@@ -17,14 +17,7 @@ typedef struct IntFunctionalUnit IntFunctionalUnit;
 typedef struct LabelTable LabelTable;
 typedef struct BranchPredictor BranchPredictor;
 typedef struct MemoryUnit MemoryUnit;
-
-// struct containing information about stall statistics
-typedef struct StallStats {
-
-    int fullROBStalls;
-    int fullResStationStalls;
-
-} StallStats;
+typedef struct StallStats StallStats;
 
 // struct representing the CPU
 typedef struct CPU {
