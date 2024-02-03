@@ -20,7 +20,7 @@ void readConfig(char *configFn, Params *params) {
 
     FILE *fp = fopen(configFn, "r");
     if (fp == NULL) {
-        printf("error: could not open config file, using all default values\n");
+        printf("could not open config file, using all default values\n");
     } else {
         
         char key[128];
@@ -188,19 +188,29 @@ void processInput(char *inputFn, CPU *cpu) {
 int main(int argc, char *argv[]) {
 
     // check number of input files
-    if (argc != 3) {
-        printf("error: invalid number of inputs provided\nusage: './cpu_sim <config_file> <input_file>'\n");
+    if (argc > 3 || argc < 2) {
+        printf("error: invalid number of inputs provided\nusage: './cpu_sim <config_file> <input_file>' or './cpu_sim <input_file>'\n");
         return 1;
+    }
+
+    char *configFn = NULL;
+    char *inputFn = NULL;
+
+    if (argc == 3) {
+        configFn = argv[1];
+        inputFn = argv[2];
+    } else if (argc == 2) {
+        inputFn = argv[1];
     }
 
     // process config file
     Params params;
-    readConfig(argv[1], &params);
+    readConfig(configFn, &params);
 
     // create new CPU struct and initialize it
     CPU cpu;
     initCPU(&cpu, &params);
-    processInput(argv[2], &cpu);
+    processInput(inputFn, &cpu);
 
     printf("initial ");
     printDataCache(cpu.dataCache);

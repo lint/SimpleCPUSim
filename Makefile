@@ -21,7 +21,7 @@ $(BUILD_DIR)/%.c.o: %.c $(HEADERS)
 $(TARGET): $(OBJECTS)
 	$(CC) $(OBJECTS) -o $@
 	@echo "\nbuilt $(TARGET) in ./"
-	@echo "run with './$(TARGET) <config_file> <input_file>'"
+	@echo "run with './$(TARGET) <input_file>' or './$(TARGET) <config_file> <input_file>'"
 
 .PHONY: clean
 
