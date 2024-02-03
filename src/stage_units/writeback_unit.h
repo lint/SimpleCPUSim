@@ -8,6 +8,7 @@ typedef struct BranchPredictor BranchPredictor;
 typedef struct MemoryUnit MemoryUnit;
 typedef struct DataCache DataCache;
 typedef struct FetchUnit FetchUnit;
+typedef struct StallStats StallStats;
 
 // struct representing a common data bus
 typedef struct CDB {
@@ -53,6 +54,6 @@ void teardownWritebackUnit(WritebackUnit *writebackUnit);
 void resetWritebackUnitROBWBInfo(WritebackUnit *writebackUnit);
 void updateWritebackUnitWaitingForROB(WritebackUnit *writebackUnit, ResStationStatusTableEntry **resStationEntries, int numEntries);
 void cycleWritebackUnit(WritebackUnit *writebackUnit, FetchUnit *fetchUnit, DecodeUnit *decodeUnit, MemoryUnit *memUnit, StatusTables *statusTables, 
-    FunctionalUnits *functionalUnits, RegisterFile *registerFile, DataCache *dataCache, BranchPredictor *branchPredictor);
+    FunctionalUnits *functionalUnits, RegisterFile *registerFile, DataCache *dataCache, BranchPredictor *branchPredictor, StallStats *stallStats);
 void printWritebackUnitROBInfo(WritebackUnit *writebackUnit);
 void printWritebackUnitCDBs(WritebackUnit *writebackUnit);

@@ -16,6 +16,8 @@
 void initStallStats(StallStats *stallStats) {
     stallStats->fullResStationStalls = 0;
     stallStats->fullROBStalls = 0;
+    stallStats->totalCDBOpenings = 0;
+    stallStats->utilizedCDBs = 0;
 }
 
 // creates a new CPU struct, initializes its data structures and components, and returns it
@@ -229,6 +231,8 @@ void printStallStats(StallStats *stallStats) {
     printf("\nstall statistics:\n");
     printf("\tstalls due to full ROB: %i\n", stallStats->fullROBStalls);
     printf("\tstalls due to full reservation stations: %i\n", stallStats->fullResStationStalls);
+    printf("\ttotal CDB operations avaialble: %i\n", stallStats->totalCDBOpenings);
+    printf("\tutilized CDBs: %i\n", stallStats->utilizedCDBs);
 }
 
 // perform cycle operations for each functional unit
@@ -303,10 +307,9 @@ void executeCPU(CPU *cpu) {
     // infinite loop to cycle the clock until execution finishes
     while (!executionIsComplete(cpu)) {
 
-       
         // perform writeback unit operations
         cycleWritebackUnit(cpu->writebackUnit, cpu->fetchUnit, cpu->decodeUnit, cpu->memUnit, 
-            cpu->statusTables, cpu->functionalUnits, cpu->registerFile, cpu->dataCache, cpu->branchPredictor);
+            cpu->statusTables, cpu->functionalUnits, cpu->registerFile, cpu->dataCache, cpu->branchPredictor, cpu->stallStats);
 
         // perform memory unit operations
         cycleMemoryUnit(cpu->memUnit, cpu->dataCache, cpu->functionalUnits->lsFU, cpu->statusTables);
@@ -338,6 +341,8 @@ void executeCPU(CPU *cpu) {
 
         cpu->cycle++;
     }
+
+    cpu->stallStats->totalCDBOpenings = cpu->cycle * cpu->params->NB;
 
     printf("\n -- DONE EXECUTION --\n\n");
     printRegisterFile(cpu->registerFile);

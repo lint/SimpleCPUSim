@@ -13,6 +13,8 @@ typedef struct Params {
 typedef struct StallStats {
     int fullROBStalls;
     int fullResStationStalls;
+    int totalCDBOpenings;
+    int utilizedCDBs;
 } StallStats;
 
 // struct representing an architectural register

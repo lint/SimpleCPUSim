@@ -36,7 +36,6 @@ typedef struct CPU {
 
     FetchUnit *fetchUnit;
     DecodeUnit *decodeUnit;
-    // IssueUnit *issueUnit;
     WritebackUnit *writebackUnit;
 
     FunctionalUnits *functionalUnits;

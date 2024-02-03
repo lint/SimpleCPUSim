@@ -134,7 +134,7 @@ void printWritebackUnitCDBs(WritebackUnit *writebackUnit) {
 
 // adds a ROB entry to the CDB
 void addROBEntryToCDB(WritebackUnit *writebackUnit, ROBStatusTableEntry *entry) {
-    
+
     CDB *cdb = writebackUnit->cdbs[writebackUnit->cdbsUsed++];
     cdb->producedBy = VALUE_FROM_ROB;
     cdb->destPhysReg = entry->renamedDestReg;
@@ -167,7 +167,7 @@ void addROBEntryToCDB(WritebackUnit *writebackUnit, ROBStatusTableEntry *entry) 
 
 // perform writeback unit operations during a cycle
 void cycleWritebackUnit(WritebackUnit *writebackUnit, FetchUnit *fetchUnit, DecodeUnit *decodeUnit, MemoryUnit *memUnit, StatusTables *statusTables, 
-    FunctionalUnits *functionalUnits, RegisterFile *registerFile, DataCache *dataCache, BranchPredictor *branchPredictor) {
+    FunctionalUnits *functionalUnits, RegisterFile *registerFile, DataCache *dataCache, BranchPredictor *branchPredictor, StallStats *stallStats) {
 
     printf_DEBUG(("\nperforming writeback unit operations...\n"));
 
@@ -484,6 +484,9 @@ void cycleWritebackUnit(WritebackUnit *writebackUnit, FetchUnit *fetchUnit, Deco
             writebackUnit->cdbsUsed++;
         }
     }
+
+    // log the number of CDBs that were used
+    stallStats->utilizedCDBs += writebackUnit->cdbsUsed;
 
     // iterate over every entry in the CDB
     for (int i = 0; i < writebackUnit->cdbsUsed; i++) {
